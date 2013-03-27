@@ -1,6 +1,7 @@
 package com.sandwich;
 
-import java.io.IOException;
+import java.net.URISyntaxException;
+import java.util.ArrayList;
 
 import com.sandwich.client.Client;
 import com.sandwich.client.ResultListener;
@@ -17,12 +18,14 @@ import android.widget.SearchView;
 import android.widget.SearchView.OnQueryTextListener;
 import android.widget.TextView;
 
-public class SearchListener implements OnQueryTextListener,ResultListener,OnItemClickListener  {
-	Client sandwichClient;
-	Activity activity;
+public class SearchListener implements OnQueryTextListener,ResultListener,OnItemClickListener,Runnable  {
+	private Client sandwichClient;
+	private Activity activity;
 	
-	SearchView searchView;
-	ListView resultsView;
+	private SearchView searchView;
+	private ListView resultsView;
+	
+	private ArrayList<String> results;
 	
 	public SearchListener(Activity activity, Client client)
 	{
@@ -32,6 +35,9 @@ public class SearchListener implements OnQueryTextListener,ResultListener,OnItem
 		// Fetch these here so we don't have to do it later
 		this.searchView = (SearchView)activity.findViewById(R.id.fileSearchView);
 		this.resultsView = (ListView)activity.findViewById(R.id.resultsListView);
+		
+		// Initialize the results list
+		results = new ArrayList<String>();
 	}
 	
 	@SuppressWarnings("unchecked")
@@ -54,15 +60,14 @@ public class SearchListener implements OnQueryTextListener,ResultListener,OnItem
 		// Remove focus from the search view
 		searchView.clearFocus();
 		
+		// Initialize the results list
+		results.clear();
+		
 		// Execute the search with the client
 		try {
 			sandwichClient.doSearch(searchView.getQuery().toString(), this);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
+		} catch (Exception e) {
+			Dialog.displayDialog(activity, "Search Error", e.getMessage(), false);
 		}
 		
 		// We handled the event so return true
@@ -76,20 +81,51 @@ public class SearchListener implements OnQueryTextListener,ResultListener,OnItem
 		return false;
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	// Called for each result found during the search
-	public synchronized void foundResult(String query, String result) {
-		ArrayAdapter<String> listAdapter = (ArrayAdapter<String>)resultsView.getAdapter();
+	public void foundResult(String query, String peer, String result) {
+		synchronized (results) {
+			results.add(peer+" - "+result);
+		}
 		
-		listAdapter.add(result);
+		activity.runOnUiThread(this);
 	}
 
 	@Override
 	// Called when an item within the list view is clicked
 	public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
 		TextView row = (TextView) view;
+		String resultTuple[] = row.getText().toString().split(" - ");
 		
-		sandwichClient.startFileDownloadFromPeer("anandtech.com", "");
+		// Result tuple is in the format: peer - file
+		try {
+			sandwichClient.startFileDownloadFromPeer(resultTuple[0], resultTuple[1]);
+		} catch (URISyntaxException e) {
+			Dialog.displayDialog(activity, "Download Error", e.getMessage(), false);
+		}
+	}
+
+	
+	@Override
+	// Called in UI thread to add search result
+	public void run() {
+		@SuppressWarnings("unchecked")
+		ArrayAdapter<String> listAdapter = (ArrayAdapter<String>)resultsView.getAdapter();
+		
+		synchronized (results) {
+			for (String result : results)
+			{
+				listAdapter.add(result);
+			}
+			
+			// Remove the results we just added
+			results.clear();
+		}
+	}
+
+	
+	@Override
+	public void searchFailed(String query, String peer, Exception e) {
+		Dialog.displayDialog(activity, "Search Error", e.getMessage(), false);
 	}
 }

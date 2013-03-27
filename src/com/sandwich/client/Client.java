@@ -8,18 +8,25 @@ import java.io.IOException;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.Scanner;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import android.app.DownloadManager;
 import android.content.Context;
 import android.net.Uri;
+import android.os.Environment;
 
 public class Client {
-	Context context;
-	PeerSet peers;
+	private Context context;
+	private PeerSet peers;
 	
 	public Client(Context context)
 	{
@@ -27,9 +34,12 @@ public class Client {
 		this.peers = null;
 	}
 	
-	private HttpURLConnection createHttpConnection(URL url) throws IOException
+	private static HttpURLConnection createHttpConnection(URL url) throws IOException
 	{
-		HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+		HttpURLConnection conn;
+		
+		System.out.println("Connecting to "+url.toExternalForm());
+		conn = (HttpURLConnection) url.openConnection();
 		
 		// Disable cache
 		conn.setUseCaches(false);
@@ -37,7 +47,7 @@ public class Client {
 		return conn;
 	}
 	
-	private int sendGetRequest(HttpURLConnection conn) throws IOException
+	private static int sendGetRequest(HttpURLConnection conn) throws IOException
 	{		
 		// Send the get request
 		conn.setRequestMethod("GET");
@@ -46,13 +56,13 @@ public class Client {
 		return conn.getResponseCode();
 	}
 	
-	private URL createQueryUrl(URL peerUrl, String querySuffix) throws MalformedURLException
+	static URL createQueryUrl(URL peerUrl, String querySuffix) throws MalformedURLException
 	{
 		String urlString = peerUrl.toExternalForm();
 		
 		// If it doesn't end with a slash, normalize it by adding a slash
-		if (!urlString.endsWith("\\"))
-			urlString += "\\";
+		if (!urlString.endsWith("/"))
+			urlString += "/";
 		
 		// Now append the query suffix
 		urlString += querySuffix;
@@ -60,7 +70,7 @@ public class Client {
 		return new URL(urlString);
 	}
 	
-	private BufferedInputStream getInputStreamFromUrl(URL url) throws IOException
+	static BufferedInputStream getInputStreamFromUrl(URL url) throws IOException
 	{
 		HttpURLConnection conn;
 		int responseCode;
@@ -78,11 +88,13 @@ public class Client {
 		return new BufferedInputStream(conn.getInputStream());
 	}
 	
-	private PeerSet getPeerList(URL bootstrapUrl) throws IOException
+	private PeerSet getPeerList(URL bootstrapUrl) throws IOException, JSONException
 	{
 		URL queryUrl;
 		Scanner in;
 		PeerSet peerSet;
+		JSONArray jsonPeerList;
+		String json;
 		
 		// Build the query peer list URL
 		queryUrl = createQueryUrl(bootstrapUrl, "peerlist");
@@ -90,16 +102,25 @@ public class Client {
 		// Get an input stream from the GET request on this URL
 		in = new Scanner(getInputStreamFromUrl(queryUrl));
 		
-		// Read each line and add it to the peer set
-		peerSet = new PeerSet();
-		while (in.hasNextLine())
+		// Read the JSON response
+		json = "";
+		while (in.hasNext())
 		{
-			String nextPeer = in.nextLine();
-
-			if (!peerSet.addPeerByString(nextPeer))
-			{
-				System.out.println("WARNING: Duplicate peer - "+nextPeer);
-			}
+			json += in.next();
+		}
+		
+		System.out.println("Peerlist response: "+json);
+		
+		jsonPeerList = new JSONArray(json);
+		peerSet = new PeerSet();
+		for (int i = 0; i < jsonPeerList.length(); i++)
+		{
+			JSONObject jsonPeer = jsonPeerList.getJSONObject(i);
+			
+			System.out.println("Parsing JSON object: "+jsonPeer.toString());
+			
+			// We only care about the IP field on Android
+			peerSet.addPeerByString(jsonPeer.getString("IP"));
 		}
 		
 		in.close();
@@ -107,38 +128,17 @@ public class Client {
 		return peerSet;
 	}
 	
-	private void downloadIndexForPeer(URL bootstrapUrl, String peer) throws IOException
+	private Thread startDownloadIndexThreadForPeer(URL bootstrapUrl, String peer)
 	{
-		URL queryUrl;
-		BufferedInputStream in;
-		DataOutputStream fileOut;
-		
-		// Build the query index URL
-		queryUrl = createQueryUrl(bootstrapUrl, "indexfor?ip="+peer);
-		
-		// Get an input stream from the GET request on this URL
-		in = getInputStreamFromUrl(queryUrl);
-		
-		// Open the target file
-		fileOut = new DataOutputStream(new BufferedOutputStream(context.openFileOutput(peer, 0)));
-		
-		// Read the index and write the it to a file
-		while (in.available() > 0)
-		{
-			byte buf[] = new byte[in.available()];
-			
-			in.read(buf);
-			
-			fileOut.write(buf);
-		}
-		
-		fileOut.close();
-		in.close();
+		Thread t = new Thread(new IndexDownloadThread(context, bootstrapUrl, peer));
+		t.start();
+		return t;
 	}
 	
-	public void bootstrap(URL bootstrapUrl) throws IOException
+	public void bootstrap(URL bootstrapUrl) throws IOException, JSONException, InterruptedException
 	{
 		Iterator<String> iterator;
+		ArrayList<Thread> threadList;
 
 		if (peers != null)
 		{
@@ -152,14 +152,17 @@ public class Client {
 		
 		// Iterate the peer list and download indexes for each
 		iterator = peers.getPeerListIterator();
+		threadList = new ArrayList<Thread>();
 		while (iterator.hasNext())
 		{
 			String peer = iterator.next();
 			
-			System.out.println("Downloading index for peer: "+peer);
-			
-			downloadIndexForPeer(bootstrapUrl, peer);
+			threadList.add(startDownloadIndexThreadForPeer(bootstrapUrl, peer));
 		}
+		
+		// Wait for downloads to finish
+		for (Thread t : threadList)
+			t.join();
 		
 		System.out.println("Bootstrapped");
 	}
@@ -170,13 +173,7 @@ public class Client {
 		
 		if (peers == null)
 		{
-			//throw new IllegalStateException("Not bootstrapped");
-			
-			listener.foundResult(query, query+" eat");
-			listener.foundResult(query, query+" my");
-			listener.foundResult(query, query+" sandwich");
-
-			return;
+			throw new IllegalStateException("Not bootstrapped");
 		}
 		
 		// Start search threads for each peer
@@ -186,7 +183,8 @@ public class Client {
 			String peer = peerIterator.next();
 
 			// Start the search thread
-			Thread t = new Thread(new SearchThread(listener, context.openFileInput(peer), query));
+			System.out.println("Spawning thread to search "+peer);
+			Thread t = new Thread(new SearchThread(listener, context.openFileInput(peer), peer, query));
 			threads.add(t);
 			t.start();
 		}
@@ -198,21 +196,33 @@ public class Client {
 		}
 	}
 	
-	public void startFileDownloadFromPeer(String peer, String file)
+	public void startFileDownloadFromPeer(String peer, String file) throws URISyntaxException
 	{
 		DownloadManager downloader = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
 		DownloadManager.Request request;
 		String title;
+		String url;
 		
 		// Make a title from the last component of the file path
 		title = file;
 		if (title.lastIndexOf("/") > 0)
 			title = title.substring(title.lastIndexOf("/"));
+
+		//url = new URI("http", null, peer, 8000, "/file", "path="+file, null).toString();
+		url = "http://anandtech.com/img/logo2.png";
 		
-		request = new DownloadManager.Request(Uri.parse("http://"+peer+"/files/"+file));
+		System.out.println("Downloading URL: "+url+" ("+title+")");
+
+		request = new DownloadManager.Request(Uri.parse(url));
+		
+		// Download to the external downloads folder
+		request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "logo2.png");
 		
 		// Allow the media scanner to pick this file up
 		request.allowScanningByMediaScanner();
+		
+		// Continue showing the notification even after the download finishes
+		request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
 		
 		// Give it our title
 		request.setTitle(title);
@@ -220,32 +230,106 @@ public class Client {
 		// Fire the download
 		downloader.enqueue(request);
 	}
+
+
 }
 
-class SearchThread implements Runnable {
-	FileInputStream peerFile;
-	String query;
-	ResultListener listener;
+class IndexDownloadThread implements Runnable {
+	Context context;
+	URL bootstrapUrl;
+	String peer;
 	
-	public SearchThread(ResultListener listener, FileInputStream peerFile, String query)
+	public IndexDownloadThread(Context context, URL bootstrapUrl, String peer)
 	{
-		this.peerFile = peerFile;
-		this.listener = listener;
-		this.query = query;
+		this.context = context;
+		this.bootstrapUrl = bootstrapUrl;
+		this.peer = peer;
 	}
 
 	@Override
 	public void run() {
-		Scanner scanner = new Scanner(new BufferedInputStream(peerFile));
+		URL queryUrl;
+		BufferedInputStream in;
+		DataOutputStream fileOut;
 		
-		while (scanner.hasNextLine())
-		{
-			String file = scanner.nextLine();
+		try {
+			// Build the query index URL
+			queryUrl = Client.createQueryUrl(bootstrapUrl, "indexfor?ip="+peer);
 			
-			if (file.contains(query))
+			// Get an input stream from the GET request on this URL
+			in = Client.getInputStreamFromUrl(queryUrl);
+			
+			// Open the target file
+			fileOut = new DataOutputStream(new BufferedOutputStream(context.openFileOutput(peer, 0)));
+			
+			// Read the index and write the it to a file
+			for (;;)
 			{
-				listener.foundResult(query, file);
+				int size = in.available();
+				
+				if (size == 0) size = 1;
+				
+				byte buf[] = new byte[size];
+				
+				if (in.read(buf) == -1)
+					break;
+				
+				fileOut.write(buf);
 			}
+			
+			fileOut.close();
+			in.close();
+			
+			System.out.println("Wrote index: "+peer);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+}
+
+class SearchThread implements Runnable {
+	FileInputStream peerFile;
+	String query, peer;
+	ResultListener listener;
+	
+	public SearchThread(ResultListener listener, FileInputStream peerFile, String peer, String query)
+	{
+		this.peerFile = peerFile;
+		this.listener = listener;
+		this.query = query;
+		this.peer = peer;
+	}
+
+	@Override
+	public void run() {
+		String json;
+		Scanner in;
+		
+		json = "";
+		in = new Scanner(new BufferedInputStream(peerFile));
+		
+		while (in.hasNext())
+		{
+			json += in.next();
+		}
+		
+		try {
+			JSONObject index = new JSONObject(json);
+			JSONArray fileList = index.getJSONArray("List");
+			
+			for (int i = 0; i < fileList.length(); i++)
+			{
+				JSONObject fileDescriptor = fileList.getJSONObject(i);
+				String file = fileDescriptor.getString("FileName");
+				
+				System.out.println("Searching "+file+" for query "+query);
+				if (file.toUpperCase().contains(query.toUpperCase()))
+				{
+					listener.foundResult(query, peer, file);
+				}
+			}
+		} catch (JSONException e) {
+			listener.searchFailed(query, peer, e);
 		}
 	}
 }
