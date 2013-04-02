@@ -6,24 +6,30 @@ import android.os.Bundle;
 import android.app.Activity;
 
 public class Search extends Activity {
-
+	BootstrapThread bootstrapper;
+	
     @Override
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_search);
-
-        new Thread(new JankyThread(this)).start();
+        
+    	// Create the bootstrapper thread
+        bootstrapper = new BootstrapThread(this);
+        
+        // Call UI initialization code from the UI thread
+        bootstrapper.initialize();
     }
 
     @Override
-    protected void onUserLeaveHint()
+    public void onStart()
     {
-    	super.onUserLeaveHint();
-    	
-    	finish();
+    	super.onStart();
+        
+        // Start the bootstrapping process
+        new Thread(bootstrapper).start();
     }
-    
+
     @Override
     protected void onDestroy()
     {

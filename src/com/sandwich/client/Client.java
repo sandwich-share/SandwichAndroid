@@ -210,12 +210,16 @@ public class Client {
 		{
 			if (c.getString(0).equals(peer))
 			{
-				return Long.parseLong(c.getString(1), 10);
+				String hash = c.getString(1);
+
+				c.close();
+				return Long.parseLong(hash, 10);
 			}
 
 			c.moveToNext();
 		}
-		
+
+		c.close();
 		return -1;
 	}
 	
@@ -224,11 +228,6 @@ public class Client {
 		Iterator<PeerSet.Peer> iterator;
 		ArrayList<Thread> threadList;
 		SQLiteDatabase database;
-
-		if (peers != null)
-		{
-			throw new IllegalStateException("Already bootstrapped");
-		}
 
 		System.out.println("Downloading the peer list");
 		
@@ -267,8 +266,6 @@ public class Client {
 
 					// We need to insert this into the list
 					database.insert("peers", null, vals);
-					
-
 				}
 				else if (oldHash != peer.getIndexHash())
 				{
@@ -324,7 +321,7 @@ public class Client {
 			PeerSet.Peer peer = peerIterator.next();
 
 			// Start the search thread
-			System.out.println("Spawning thread to search "+peer);
+			System.out.println("Spawning thread to search "+peer.getIpAddress());
 			Thread t = new Thread(new SearchThread(context, listener, context.openFileInput(peer.getIpAddress()), peer, query));
 			threads.add(t);
 			t.start();
@@ -460,7 +457,6 @@ class SearchThread implements Runnable {
 				JSONObject fileDescriptor = fileList.getJSONObject(i);
 				String file = fileDescriptor.getString("FileName");
 				
-				System.out.println("Searching "+file+" for query "+query);
 				if (file.toUpperCase().contains(query.toUpperCase()))
 				{
 					listener.foundResult(query, peer.getIpAddress(), file);
