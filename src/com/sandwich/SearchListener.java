@@ -1,6 +1,5 @@
 package com.sandwich;
 
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 
 import com.sandwich.client.Client;
@@ -100,7 +99,7 @@ public class SearchListener implements OnQueryTextListener,ResultListener,OnItem
 		// Result tuple is in the format: peer - file
 		try {
 			sandwichClient.startFileDownloadFromPeer(resultTuple[0], resultTuple[1]);
-		} catch (URISyntaxException e) {
+		} catch (Exception e) {
 			Dialog.displayDialog(activity, "Download Error", e.getMessage(), false);
 		}
 	}

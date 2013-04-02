@@ -1,6 +1,8 @@
 package com.sandwich;
 
-import java.net.URL;
+import java.net.Inet6Address;
+import java.net.InetAddress;
+import java.net.URI;
 
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
@@ -35,12 +37,15 @@ public class JankyThread implements Runnable {
         
 		SpinnerDialog d = SpinnerDialog.displayDialog(activity, "Please Wait", "Waiting for bootstrap");
 		try {
-			//c.bootstrap(new URL("http://172.20.47.217:8000"));
-			c.bootstrap(new URL("http://isys-ubuntu.case.edu:8000"));
+			String host = "isys-ubuntu.case.edu";
+			InetAddress hostaddr = Inet6Address.getByName(host);
+
+			c.bootstrap(new URI("http", null, hostaddr.getHostAddress(), Client.getPortNumberFromIPAddress(hostaddr), null, null, null).toURL());
 			d.dismiss();
 		} catch (Exception e) {
 			d.dismiss();
 			Dialog.displayDialog(activity, "Bootstrap Error", e.getMessage(), true);
+			e.printStackTrace();
 		}
 	}
 
