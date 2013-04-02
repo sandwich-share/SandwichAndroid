@@ -308,7 +308,7 @@ public class Client {
 
 	}
 	
-	public void doSearch(String query, ResultListener listener) throws IOException, InterruptedException
+	public void beginSearch(String query, ResultListener listener) throws IOException, InterruptedException
 	{
 		ArrayList<Thread> threads = new ArrayList<Thread>();
 		
@@ -328,12 +328,6 @@ public class Client {
 			Thread t = new Thread(new SearchThread(context, listener, context.openFileInput(peer.getIpAddress()), peer, query));
 			threads.add(t);
 			t.start();
-		}
-		
-		// Wait for search threads to terminate
-		for (Thread t : threads)
-		{
-			t.join();
 		}
 	}
 

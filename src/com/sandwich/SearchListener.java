@@ -62,9 +62,9 @@ public class SearchListener implements OnQueryTextListener,ResultListener,OnItem
 		// Initialize the results list
 		results.clear();
 		
-		// Execute the search with the client
+		// Execute the asynchronous search with the client
 		try {
-			sandwichClient.doSearch(searchView.getQuery().toString(), this);
+			sandwichClient.beginSearch(searchView.getQuery().toString(), this);
 		} catch (Exception e) {
 			Dialog.displayDialog(activity, "Search Error", e.getMessage(), false);
 		}
