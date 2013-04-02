@@ -7,6 +7,7 @@ import android.app.Activity;
 
 public class Search extends Activity {
 	BootstrapThread bootstrapper;
+	Thread thread;
 	
     @Override
     protected void onCreate(Bundle savedInstanceState)
@@ -16,6 +17,7 @@ public class Search extends Activity {
         
     	// Create the bootstrapper thread
         bootstrapper = new BootstrapThread(this);
+        thread = null;
         
         // Call UI initialization code from the UI thread
         bootstrapper.initialize();
@@ -26,8 +28,12 @@ public class Search extends Activity {
     {
     	super.onStart();
         
-        // Start the bootstrapping process
-        new Thread(bootstrapper).start();
+        // Start the bootstrapping process if it's not already running
+    	if (thread == null || thread.getState() == Thread.State.TERMINATED)
+    	{
+    		thread = new Thread(bootstrapper);
+    		thread.start();
+    	}
     }
 
     @Override

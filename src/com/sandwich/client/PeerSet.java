@@ -11,6 +11,12 @@ public class PeerSet {
 		peerSet = new HashSet<Peer>();
 	}
 	
+	public synchronized void updatePeerSet(PeerSet peers)
+	{
+		peerSet.clear();
+		peerSet.addAll(peers.peerSet);
+	}
+	
 	public synchronized boolean addPeer(String ip, String timestamp, long indexHash)
 	{
 		Peer p = new Peer(ip, timestamp, indexHash);

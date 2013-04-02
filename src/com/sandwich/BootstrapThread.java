@@ -1,8 +1,5 @@
 package com.sandwich;
 
-import java.net.Inet6Address;
-import java.net.InetAddress;
-import java.net.URI;
 
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
@@ -13,6 +10,7 @@ import com.sandwich.client.Client;
 public class BootstrapThread implements Runnable {
 	private Search activity;
 	private Client client;
+	private boolean bootstrapped;
 	
 	public BootstrapThread(Search activity)
 	{
@@ -41,22 +39,40 @@ public class BootstrapThread implements Runnable {
         ListView results = (ListView)activity.findViewById(R.id.resultsListView);
         results.setAdapter(new ArrayAdapter<String>(activity, R.layout.simplerow));
         results.setOnItemClickListener(listener);
+        
+        // Bootstrap from the cache initially
+        bootstrapped = client.bootstrapFromCache();
 	}
 	
 	@Override
 	public void run() {
+		SpinnerDialog d;
+
 		if (client == null)
 			throw new IllegalStateException("Bootstrap thread was not initialized");
 		
-		SpinnerDialog d = SpinnerDialog.displayDialog(activity, "Please Wait", "Waiting for bootstrap");
-		try {
-			String host = "isys-ubuntu.case.edu";
-			InetAddress hostaddr = Inet6Address.getByName(host);
+		// If we're not running on cache, we want to display the spinner and block the user, otherwise we just bootstrap in the background
+		if (!bootstrapped)
+		{
+			d = SpinnerDialog.displayDialog(activity, "Please Wait", "Waiting for initial bootstrap");
+		}
+		else
+		{
+			d = null;
+		}
 
-			client.bootstrap(new URI("http", null, hostaddr.getHostAddress(), Client.getPortNumberFromIPAddress(hostaddr), null, null, null).toURL());
-			d.dismiss();
+		try {
+			String initialHost = "isys-ubuntu.case.edu";
+
+			// Bootstrap from network
+			client.bootstrapFromNetwork(initialHost);
+			
+			// Bootstrapped
+			bootstrapped = true;
+			
+			if (d != null) d.dismiss();
 		} catch (Exception e) {
-			d.dismiss();
+			if (d != null) d.dismiss();
 			Dialog.displayDialog(activity, "Bootstrap Error", e.getMessage(), true);
 			e.printStackTrace();
 		}
