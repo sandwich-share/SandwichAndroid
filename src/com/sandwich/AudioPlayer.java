@@ -16,7 +16,6 @@ public class AudioPlayer extends Activity {
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_audio_player);
-		getActionBar().setDisplayHomeAsUpEnabled(true);
 		
 		player = new com.sandwich.player.AudioPlayer(this);
 		Bundle extras = getIntent().getExtras();
@@ -38,7 +37,5 @@ public class AudioPlayer extends Activity {
     	
     	if (player != null)
     		player.release();
-
-		getActionBar().setDisplayHomeAsUpEnabled(false);
     }
 }

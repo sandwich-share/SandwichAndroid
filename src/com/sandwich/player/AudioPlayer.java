@@ -33,34 +33,7 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 	
 	boolean touchActive = false;
 	
-	private Handler handler = new Handler()
-	{
-	    @Override
-	    public void handleMessage(Message msg)
-	    {
-	        int pos;
-	        switch (msg.what)
-	        {
-	            case SHOW_PROGRESS:
-	            	if (player != null)
-	            	{
-	            		pos = player.getCurrentPosition();
-	            		seeker.setProgress(pos);
-	                
-	            		if (!touchActive && player.isPlaying())
-	            		{
-	            			msg = obtainMessage(SHOW_PROGRESS);
-	            			sendMessageDelayed(msg, 1000);
-	            		}
-	            	}
-	                break;
-	                
-	            default:
-	            	super.handleMessage(msg);
-	            	break;
-	        }
-	    }
-	};
+	private Handler handler;
 	
 	final static int SHOW_PROGRESS = 12813;
 	
@@ -71,6 +44,35 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 		this.seeker = (SeekBar)activity.findViewById(R.id.seekBar);
 		this.playpause = (Button)activity.findViewById(R.id.playButton);
 		this.timeView = (TextView)activity.findViewById(R.id.timeView);
+		
+		handler = new Handler()
+		{
+		    @Override
+		    public void handleMessage(Message msg)
+		    {
+		        int pos;
+		        switch (msg.what)
+		        {
+		            case SHOW_PROGRESS:
+		            	if (player != null)
+		            	{
+		            		pos = player.getCurrentPosition();
+		            		seeker.setProgress(pos);
+		                
+		            		if (!touchActive && player.isPlaying())
+		            		{
+		            			msg = obtainMessage(SHOW_PROGRESS);
+		            			sendMessageDelayed(msg, 1000);
+		            		}
+		            	}
+		                break;
+		                
+		            default:
+		            	super.handleMessage(msg);
+		            	break;
+		        }
+		    }
+		};
 	}
 	
 	public void initialize(Uri filePath) throws IllegalArgumentException, SecurityException, IllegalStateException, IOException

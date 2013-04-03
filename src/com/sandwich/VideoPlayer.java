@@ -16,10 +16,6 @@ public class VideoPlayer extends Activity {
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_video_player);
-		getActionBar().setDisplayHomeAsUpEnabled(true);
-		
-		// HACK: VideoView does not resize properly so disable rotation
-		
 
 		player = new com.sandwich.player.VideoPlayer(this);
 		Bundle extras = getIntent().getExtras();
@@ -40,7 +36,5 @@ public class VideoPlayer extends Activity {
     	
     	if (player != null)
     		player.release();
- 
-		getActionBar().setDisplayHomeAsUpEnabled(false);
-    }
+     }
 }
