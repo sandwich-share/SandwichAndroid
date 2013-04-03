@@ -1,5 +1,6 @@
 package com.sandwich;
 
+
 import com.sandwich.R;
 
 import android.os.Bundle;
@@ -14,7 +15,7 @@ public class Search extends Activity {
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_search);
-        
+
     	// Create the bootstrapper thread
         bootstrapper = new BootstrapThread(this);
         thread = null;

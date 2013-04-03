@@ -39,6 +39,7 @@ public class BootstrapThread implements Runnable {
         ListView results = (ListView)activity.findViewById(R.id.resultsListView);
         results.setAdapter(new ArrayAdapter<String>(activity, R.layout.simplerow));
         results.setOnItemClickListener(listener);
+        results.setOnItemLongClickListener(listener);
         
         // Bootstrap from the cache initially
         bootstrapped = client.bootstrapFromCache();

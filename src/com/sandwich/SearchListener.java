@@ -11,13 +11,14 @@ import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
+import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.SearchView;
 import android.widget.SearchView.OnQueryTextListener;
 import android.widget.TextView;
 
-public class SearchListener implements OnQueryTextListener,ResultListener,OnItemClickListener,Runnable  {
+public class SearchListener implements OnQueryTextListener,ResultListener,OnItemClickListener,Runnable,OnItemLongClickListener  {
 	private Client sandwichClient;
 	private Activity activity;
 	
@@ -25,7 +26,7 @@ public class SearchListener implements OnQueryTextListener,ResultListener,OnItem
 	private ListView resultsView;
 	
 	private ArrayList<String> results;
-	
+		
 	public SearchListener(Activity activity, Client client)
 	{
 		this.sandwichClient = client;
@@ -126,5 +127,23 @@ public class SearchListener implements OnQueryTextListener,ResultListener,OnItem
 	@Override
 	public void searchFailed(String query, String peer, Exception e) {
 		Dialog.displayDialog(activity, "Search Error", e.getMessage(), false);
+	}
+
+	@Override
+	public boolean onItemLongClick(AdapterView<?> adapterView, View view, int position, long id) {
+		TextView row = (TextView) view;
+		String resultTuple[] = row.getText().toString().split(" - ");
+		
+		// Result tuple is in the format: peer - file
+		try {
+			sandwichClient.startFileStreamFromPeer(activity, resultTuple[0], resultTuple[1]);
+		} catch (Exception e) {
+			e.printStackTrace();
+			Dialog.displayDialog(activity, "Streaming Error", e.getMessage(), false);
+			return true;
+		}
+		
+		// We handled the item already
+		return true;
 	}
 }

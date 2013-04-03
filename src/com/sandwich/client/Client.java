@@ -15,6 +15,7 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
+import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -26,9 +27,11 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ContentValues;
 import android.content.Context;
+import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
@@ -477,6 +480,41 @@ public class Client {
 		
 		// Fire the download
 		downloader.enqueue(request);
+	}
+	
+	public boolean startFileStreamFromPeer(Activity activity, String peer, String file) throws NoSuchAlgorithmException, URISyntaxException, MalformedURLException, IOException
+	{
+		String url;
+		String mimeType;
+
+		mimeType = URLConnection.guessContentTypeFromName(file);
+		url = createPeerUrlString(peer, "/file", "path="+file);
+		if (mimeType == null)
+		{
+			// Undetermined MIME type
+			return false;
+		}
+		else if (mimeType.startsWith("audio/"))
+		{
+			// Create the audio player activity
+			Intent i = new Intent(activity, com.sandwich.AudioPlayer.class);
+			i.putExtra("URL", url);
+			activity.startActivity(i);
+		}
+		else if (mimeType.startsWith("video/"))
+		{
+			// Create the video player activity
+			Intent i = new Intent(activity, com.sandwich.VideoPlayer.class);
+			i.putExtra("URL", url);
+			activity.startActivity(i);
+		}
+		else
+		{
+			// No player for this
+			return false;
+		}
+		
+		return true;
 	}
 }
 
