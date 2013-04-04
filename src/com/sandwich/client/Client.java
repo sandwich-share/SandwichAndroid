@@ -761,19 +761,14 @@ class SearchThread implements Runnable {
 	@Override
 	public void run() {
 		try {
-			Cursor c = database.query(Client.getTableNameForPeer(peer), new String[] {"FileName"}, null, null, null, null, null, null);
+			Cursor c = database.query(Client.getTableNameForPeer(peer), new String[] {"FileName"}, "FileName LIKE '%"+query+"%'" , null, null, null, null, null);
 			
 			// Iterate the cursor
 			c.moveToFirst();
 			while (!c.isAfterLast())
 			{
 				String file = c.getString(0);
-				
-				if (file.contains(query))
-				{
-					listener.foundResult(query, peer.getIpAddress(), file);
-				}
-				
+				listener.foundResult(query, peer.getIpAddress(), file);
 				c.moveToNext();
 			}
 			c.close();
