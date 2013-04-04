@@ -20,7 +20,9 @@ import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Iterator;
+import java.util.Random;
 import java.util.Scanner;
 
 import org.json.JSONArray;
@@ -48,6 +50,8 @@ public class Client {
 	
 	static final String PEER_TABLE = "peers";
 	static final String PEER_DB = "peers.db";
+	
+	static final int READ_BLOCK_SIZE = 4096;
 	
 	public Client(Context context)
 	{
@@ -227,14 +231,29 @@ public class Client {
 		return peers;
 	}
 	
-	static long getOldHashOfPeerIndex(SQLiteDatabase database, String peer)
+	static boolean deletePeerFromDatabase(SQLiteDatabase database, PeerSet.Peer peer) throws SQLiteException
+	{
+		boolean ret = false;
+		database.beginTransaction();
+		try {
+			database.delete(PEER_TABLE, "IP=?", new String[] {peer.getIpAddress()});
+			database.setTransactionSuccessful();
+			ret = true;
+		} finally {
+			database.endTransaction();
+		}
+		
+		return ret;
+	}
+	
+	static long getOldHashOfPeerIndex(SQLiteDatabase database, PeerSet.Peer peer)
 	{
 		Cursor c = database.query(PEER_TABLE, new String[] {"IP", "IndexHash"}, null, null, null, null, null, null);
 		
 		c.moveToFirst();
 		while (!c.isAfterLast())
 		{
-			if (c.getString(0).equals(peer))
+			if (c.getString(0).equals(peer.getIpAddress()))
 			{
 				String hash = c.getString(1);
 
@@ -313,33 +332,51 @@ public class Client {
 	{
 		URL bootstrapUrl;
 		Iterator<PeerSet.Peer> iterator;
+		Random rand = new Random();
+		HashSet<Integer> peersTried = new HashSet<Integer>();
 		
 		System.out.println("Downloading the peer list");
-
-		// Try the initial peer first
-		if (initialPeer != null)
-		{			
-			try {
-				// Resolve address and create a URL
-				bootstrapUrl = new URL(createPeerUrlString(initialPeer, null, null));
-				
-				// Download the peer list
-				peers.updatePeerSet(getPeerList(bootstrapUrl));
-				
-				// It worked
-				return true;
-			} catch (Exception e) {
-				// Failed to connect to the initial peer, so let's try another one
-			}
-		}
 		
-		// Try to bootstrap from another peer
-		iterator = peers.getPeerListIterator();
-		while (iterator.hasNext())
+		// Bootstrap from a random peer
+		rand.setSeed(System.currentTimeMillis());
+		while (peersTried.size() < peers.getPeerListLength())
 		{
+			// Generate a random peer to bootstrap from
+			int nextPeer = rand.nextInt(peers.getPeerListLength());
+			while (peersTried.contains(Integer.valueOf(nextPeer)))
+			{
+				nextPeer++;
+				if (nextPeer == peers.getPeerListLength())
+					nextPeer = 0;
+			}
+			
+			// Add this peer to the peers tried set
+			peersTried.add(Integer.valueOf(nextPeer));
+			
+			// Get the peer object for the index
+			iterator = peers.getPeerListIterator();
+			PeerSet.Peer selectedPeer = null;
+			for (int i = 0; iterator.hasNext(); i++)
+			{
+				PeerSet.Peer currentPeer = iterator.next();
+				
+				if (i == nextPeer)
+				{
+					selectedPeer = currentPeer;
+					break;
+				}
+			}
+			
+			// Make sure it worked
+			if (selectedPeer == null)
+			{
+				// This really isn't good but we'll continue anyway
+				continue;
+			}
+				
 			try {
 				// Resolve address and create a URL
-				bootstrapUrl = new URL(createPeerUrlString(iterator.next().getIpAddress(), null, null));
+				bootstrapUrl = new URL(createPeerUrlString(selectedPeer.getIpAddress(), null, null));
 				
 				// Download the peer list
 				peers.updatePeerSet(getPeerList(bootstrapUrl));
@@ -349,6 +386,20 @@ public class Client {
 			} catch (Exception e) {
 				// Failed to connect to this one
 			}
+		}
+		
+		// Try the initial peer if all else fails
+		try {
+			// Resolve address and create a URL
+			bootstrapUrl = new URL(createPeerUrlString(initialPeer, null, null));
+			
+			// Download the peer list
+			peers.updatePeerSet(getPeerList(bootstrapUrl));
+			
+			// It worked
+			return true;
+		} catch (Exception e) {
+			// Failed to connect to the initial peer, so let's try another one
 		}
 		
 		// We're out of people to bootstrap from
@@ -387,7 +438,7 @@ public class Client {
 				long oldHash;
 				
 				// Check if the old index hash is valid
-				oldHash = getOldHashOfPeerIndex(database, peer.getIpAddress());
+				oldHash = getOldHashOfPeerIndex(database, peer);
 				if (oldHash == peer.getIndexHash())
 				{
 					System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
@@ -397,6 +448,7 @@ public class Client {
 				}
 				
 				// We need to download the updated index
+				database.acquireReference();
 				threadList.add(startDownloadIndexThreadForPeer(database, peer));
 			}
 			
@@ -406,7 +458,7 @@ public class Client {
 			
 			System.out.println("Bootstrapped");
 		} finally {
-			// Close the database
+			// Release the initial reference
 			database.close();
 		}
 
@@ -424,6 +476,7 @@ public class Client {
 		
 		// Start search threads for each peer
 		Iterator<PeerSet.Peer> peerIterator = peers.getPeerListIterator();
+		SQLiteDatabase database = getDatabase(PEER_DB);
 		while (peerIterator.hasNext())
 		{
 			PeerSet.Peer peer = peerIterator.next();
@@ -440,10 +493,14 @@ public class Client {
 
 			// Start the search thread
 			System.out.println("Spawning thread to search "+peer.getIpAddress());
-			Thread t = new Thread(new SearchThread(context, listener, file, peer, query));
+			database.acquireReference();
+			Thread t = new Thread(new SearchThread(context, listener, file, peer, query, database));
 			threads.add(t);
 			t.start();
 		}
+		
+		// Remove the initial reference
+		database.close();
 		
 		// Reap all dead peers
 		for (PeerSet.Peer p : peersToReap)
@@ -556,14 +613,9 @@ class IndexDownloadThread implements Runnable {
 			
 			// Read the index and write the it to a file
 			for (;;)
-			{
-				int size = in.available();
-				
-				if (size <= 0)
-					size = 1;
-				
-				byte buf[] = new byte[size];
-				
+			{	
+				byte buf[] = new byte[Client.READ_BLOCK_SIZE];
+
 				if (in.read(buf) == -1)
 					break;
 				
@@ -580,7 +632,7 @@ class IndexDownloadThread implements Runnable {
 			
 			database.beginTransaction();
 			try {
-				oldHash = Client.getOldHashOfPeerIndex(database, peer.getIpAddress());
+				oldHash = Client.getOldHashOfPeerIndex(database, peer);
 				if (oldHash == -1)
 				{
 					System.out.println(peer.getIpAddress()+" has never been seen before (new hash: "+peer.getIndexHash()+")");
@@ -608,6 +660,9 @@ class IndexDownloadThread implements Runnable {
 			// Remove this peer from the peer set
 			peer.remove();
 		}
+		
+		// Dereference the database
+		database.releaseReference();
 	}
 }
 
@@ -617,14 +672,16 @@ class SearchThread implements Runnable {
 	PeerSet.Peer peer;
 	ResultListener listener;
 	Context context;
+	SQLiteDatabase database;
 	
-	public SearchThread(Context context, ResultListener listener, FileInputStream peerFile, PeerSet.Peer peer, String query)
+	public SearchThread(Context context, ResultListener listener, FileInputStream peerFile, PeerSet.Peer peer, String query, SQLiteDatabase database)
 	{
 		this.context = context;
 		this.peerFile = peerFile;
 		this.listener = listener;
 		this.query = query;
 		this.peer = peer;
+		this.database = database;
 	}
 
 	@Override
@@ -654,6 +711,7 @@ class SearchThread implements Runnable {
 					listener.foundResult(query, peer.getIpAddress(), file);
 				}
 			}
+			
 		} catch (JSONException e) {
 			System.out.println(e.getMessage());
 			
@@ -662,6 +720,12 @@ class SearchThread implements Runnable {
 			
 			// Remove them from the peer set
 			peer.remove();
+			
+			// Remove them from the database
+			Client.deletePeerFromDatabase(database, peer);
 		}
+		
+		// Dereference the database
+		database.releaseReference();
 	}
 }
