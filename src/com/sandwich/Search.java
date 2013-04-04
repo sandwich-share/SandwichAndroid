@@ -1,6 +1,7 @@
 package com.sandwich;
 
 import android.os.Bundle;
+import android.view.Window;
 import android.app.Activity;
 import android.app.SearchManager;
 import android.content.Intent;
@@ -12,6 +13,10 @@ public class Search extends Activity {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
+		// No title
+		requestWindowFeature(Window.FEATURE_NO_TITLE);
+		
 		setContentView(R.layout.activity_search);
 
     	// Create the bootstrapper thread

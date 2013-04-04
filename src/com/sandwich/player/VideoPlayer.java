@@ -77,7 +77,10 @@ public class VideoPlayer implements SandwichPlayer,OnErrorListener,OnPreparedLis
 			waitDialog.dismiss();
 			waitDialog = null;
 		}
-		return false;
+		
+		// Close the player
+		activity.finish();
+		return true;
 	}
 
 	@Override

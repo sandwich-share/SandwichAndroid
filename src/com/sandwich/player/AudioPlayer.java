@@ -138,7 +138,10 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 			waitDialog.dismiss();
 			waitDialog = null;
 		}
-		return false;
+		
+		// Close the player
+		activity.finish();
+		return true;
 	}
 
 	@Override
