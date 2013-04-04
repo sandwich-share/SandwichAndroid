@@ -181,6 +181,7 @@ public class Client {
 		
 		// Build the query peer list URL
 		queryUrl = createQueryUrl(bootstrapUrl, "peerlist");
+		System.out.println("Getting peerlist from "+queryUrl.toExternalForm());
 		
 		// Create a URL connection to the peer
 		conn = Client.createHttpConnection(queryUrl, false);
@@ -247,6 +248,8 @@ public class Client {
 			System.out.println("Dropped peers row for: "+peer.getIpAddress());
 			database.setTransactionSuccessful();
 			ret = true;
+		} catch (SQLiteException e) {
+			// It's ok for this to fail
 		} finally {
 			database.endTransaction();
 		}
@@ -367,6 +370,7 @@ public class Client {
 		{
 			// Generate a random peer to bootstrap from
 			int nextPeer = rand.nextInt(peers.getPeerListLength());
+			System.out.println("Bootstrapping from peer index: "+nextPeer);
 			
 			// Get the peer object for the index
 			iterator = peers.getPeerListIterator();
@@ -410,6 +414,8 @@ public class Client {
 
 		// Try the initial peer if all else fails
 		try {
+			System.out.println("Trying initial peer: "+initialPeer);
+			
 			// Resolve address and create a URL
 			bootstrapUrl = new URL(createPeerUrlString(initialPeer, null, null));
 			
@@ -607,6 +613,9 @@ class IndexDownloadThread implements Runnable {
 		
 		conn = null;
 		in = null;
+		
+		// Drop the tables and rows for this peer
+		Client.deletePeerFromDatabase(database, peer);
 		try {
 			// Build the query index URL
 			queryUrl = new URL(Client.createPeerUrlString(peer.getIpAddress(), "/indexfor", null));
@@ -618,10 +627,7 @@ class IndexDownloadThread implements Runnable {
 			in = Client.getInputStreamFromConnection(conn);
 			
 			// Create the required table
-			try {
-				// FIXME: Janky
-				database.execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY);");
-			} catch (SQLiteException e) { }
+			database.execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY);");
 			
 			// Read from the GET response
 			JsonReader reader = new JsonReader(new InputStreamReader(in));

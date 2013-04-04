@@ -73,10 +73,21 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
 		TextView row = (TextView) view;
 		String resultTuple[] = row.getText().toString().split(" - ");
+		String filePath;
+		
+		// Only the first split is ours, any other belongs in the path
+		filePath = "";
+		for (int i = 1; i < resultTuple.length; i++)
+		{
+			if (i > 1)
+				filePath += " - ";
+			
+			filePath += resultTuple[i];
+		}
 		
 		// Result tuple is in the format: peer - file
 		try {
-			sandwichClient.startFileDownloadFromPeer(resultTuple[0], resultTuple[1]);
+			sandwichClient.startFileDownloadFromPeer(resultTuple[0], filePath);
 		} catch (Exception e) {
 			Dialog.displayDialog(activity, "Download Error", e.getMessage(), false);
 			return true;
