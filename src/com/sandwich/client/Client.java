@@ -27,6 +27,7 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ContentValues;
@@ -36,6 +37,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Environment;
 
 public class Client {
@@ -448,6 +450,7 @@ public class Client {
 			p.remove();
 	}
 
+	@TargetApi(11)
 	public void startFileDownloadFromPeer(String peer, String file) throws URISyntaxException, UnknownHostException, NoSuchAlgorithmException
 	{
 		DownloadManager downloader = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
@@ -469,11 +472,15 @@ public class Client {
 		// Download to the external downloads folder
 		request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, title);
 		
-		// Allow the media scanner to pick this file up
-		request.allowScanningByMediaScanner();
+		// DownloadManager was enhanced with Honeycomb with useful features we want to activate
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+		{
+			// Allow the media scanner to pick this file up
+			request.allowScanningByMediaScanner();
 		
-		// Continue showing the notification even after the download finishes
-		request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+			// Continue showing the notification even after the download finishes
+			request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+		}
 		
 		// Give it our title
 		request.setTitle(title);
@@ -552,7 +559,8 @@ class IndexDownloadThread implements Runnable {
 			{
 				int size = in.available();
 				
-				if (size == 0) size = 1;
+				if (size <= 0)
+					size = 1;
 				
 				byte buf[] = new byte[size];
 				

@@ -1,20 +1,18 @@
 package com.sandwich;
 
-
-import com.sandwich.R;
-
 import android.os.Bundle;
 import android.app.Activity;
+import android.app.SearchManager;
+import android.content.Intent;
 
 public class Search extends Activity {
 	BootstrapThread bootstrapper;
 	Thread thread;
-	
-    @Override
-    protected void onCreate(Bundle savedInstanceState)
-    {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_search);
+
+	@Override
+	protected void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		setContentView(R.layout.activity_search);
 
     	// Create the bootstrapper thread
         bootstrapper = new BootstrapThread(this);
@@ -22,8 +20,8 @@ public class Search extends Activity {
         
         // Call UI initialization code from the UI thread
         bootstrapper.initialize();
-    }
-
+	}
+	
     @Override
     public void onStart()
     {
@@ -35,8 +33,16 @@ public class Search extends Activity {
     		thread = new Thread(bootstrapper);
     		thread.start();
     	}
+    	
+    	this.onSearchRequested();
     }
-
+    
+    @Override
+    public void onBackPressed()
+    {
+    	this.onSearchRequested();
+    }
+    
     @Override
     protected void onDestroy()
     {
@@ -45,4 +51,15 @@ public class Search extends Activity {
     	Dialog.closeDialogs();
     	SpinnerDialog.closeDialogs();
     }
+	
+	@Override
+	protected void onNewIntent(Intent intent)
+	{
+		// Verify the action and get the query
+	    if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
+	      String query = intent.getStringExtra(SearchManager.QUERY);
+	      System.out.println("Searching: "+query);
+	      bootstrapper.doSearch(query);
+	    }
+	}
 }

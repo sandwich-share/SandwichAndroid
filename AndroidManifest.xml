@@ -5,7 +5,7 @@
     android:versionName="1.0" >
 
     <uses-sdk
-        android:minSdkVersion="14"
+        android:minSdkVersion="9"
         android:targetSdkVersion="17" />
 
     <uses-permission android:name="android.permission.INTERNET" />
@@ -14,35 +14,43 @@
 
     <application
         android:allowBackup="true"
+        android:hardwareAccelerated="true"
         android:icon="@drawable/ic_launcher"
-        android:label="@string/app_name" android:hardwareAccelerated="true">
+        android:label="@string/app_name" >
         <activity
+            android:name="com.sandwich.VideoPlayer"
             android:configChanges="orientation|screenSize"
+            android:label="@string/title_activity_video_player"
+            android:parentActivityName="com.sandwich.SandwichMain"
+            android:screenOrientation="landscape" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.sandwich.Search" />
+        </activity>
+        <activity
+            android:name="com.sandwich.AudioPlayer"
+            android:configChanges="orientation|screenSize"
+            android:label="@string/title_activity_audio_player"
+            android:parentActivityName="com.sandwich.SandwichMain" >
+            <meta-data
+                android:name="android.support.PARENT_ACTIVITY"
+                android:value="com.sandwich.Search" />
+        </activity>
+        <activity
             android:name="com.sandwich.Search"
-            android:label="@string/app_name" >
+            android:label="@string/title_activity_search"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize"
+            android:theme="@android:style/Theme.NoTitleBar" >
             <intent-filter>
+            	<action android:name="android.intent.action.SEARCH" />
+        	</intent-filter>
+        	<intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
-        <activity
-            android:screenOrientation="landscape"
-            android:configChanges="orientation|screenSize"
-            android:name="com.sandwich.VideoPlayer"
-            android:label="@string/title_activity_video_player"
-            android:parentActivityName="com.sandwich.Search" >
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="com.sandwich.Search" />
-        </activity>
-        <activity
-            android:configChanges="orientation|screenSize"
-            android:name="com.sandwich.AudioPlayer"
-            android:label="@string/title_activity_audio_player"
-            android:parentActivityName="com.sandwich.Search" >
-            <meta-data
-                android:name="android.support.PARENT_ACTIVITY"
-                android:value="com.sandwich.Search" />
+        	<meta-data android:name="android.app.searchable"
+                   android:resource="@xml/searchable" />
         </activity>
     </application>
 

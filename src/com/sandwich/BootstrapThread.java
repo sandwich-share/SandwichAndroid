@@ -1,27 +1,32 @@
 package com.sandwich;
 
 
+import android.app.Activity;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
-import android.widget.SearchView;
 
 import com.sandwich.client.Client;
 
 public class BootstrapThread implements Runnable {
-	private Search activity;
+	private Activity activity;
 	private Client client;
 	private boolean bootstrapped;
+	private SearchListener listener;
 	
-	public BootstrapThread(Search activity)
+	public BootstrapThread(Activity activity)
 	{
 		this.activity = activity;
 		this.client = null;
 	}
 	
-	public void initialize()
+	public void doSearch(String query)
 	{
-    	SearchListener listener;
-    	
+		// A bit of a hack
+		listener.onQueryTextSubmit(query);
+	}
+	
+	public void initialize()
+	{    	
     	if (client != null)
     		throw new IllegalStateException("Bootstrap thread was already initialized");
     	
@@ -30,10 +35,6 @@ public class BootstrapThread implements Runnable {
 		
         // Create our search listener
         listener = new SearchListener(activity, client);
-		
-        // Add SearchListener to our file search view
-        SearchView search = (SearchView)activity.findViewById(R.id.fileSearchView);
-        search.setOnQueryTextListener(listener);
         
         // Add our array adapter to the list view
         ListView results = (ListView)activity.findViewById(R.id.resultsListView);
@@ -55,7 +56,7 @@ public class BootstrapThread implements Runnable {
 		// If we're not running on cache, we want to display the spinner and block the user, otherwise we just bootstrap in the background
 		if (!bootstrapped)
 		{
-			d = SpinnerDialog.displayDialog(activity, "Please Wait", "Waiting for initial bootstrap");
+			d = SpinnerDialog.displayDialog(activity, "Please Wait", "Waiting for initial bootstrap", false);
 		}
 		else
 		{

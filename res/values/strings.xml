@@ -2,7 +2,10 @@
 <resources>
 
     <string name="app_name">Sandwich</string>
+    <string name="search_hint">Search the network</string>
     <string name="title_activity_video_player">Sandwich Video Player</string>
     <string name="title_activity_audio_player">Sandwich Audio Player</string>
+    <string name="title_activity_search">Sandwich</string>
+    <string name="action_settings">Settings</string>
 
 </resources>

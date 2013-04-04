@@ -1,17 +1,20 @@
 package com.sandwich.player;
 
 import com.sandwich.R;
+import com.sandwich.SpinnerDialog;
 
 import android.app.Activity;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnErrorListener;
+import android.media.MediaPlayer.OnPreparedListener;
 import android.net.Uri;
 import android.widget.MediaController;
 import android.widget.VideoView;
 
-public class VideoPlayer implements SandwichPlayer,OnErrorListener {
+public class VideoPlayer implements SandwichPlayer,OnErrorListener,OnPreparedListener {
 	private Activity activity;
 	private VideoView player;
+	private SpinnerDialog waitDialog;
 	
 	public VideoPlayer(Activity activity)
 	{
@@ -30,6 +33,7 @@ public class VideoPlayer implements SandwichPlayer,OnErrorListener {
 		player.setMediaController(controller);
 		player.setVideoURI(mediaPath);
 		player.setOnErrorListener(this);
+		player.setOnPreparedListener(this);
 	}
 	
 	public void start()
@@ -38,11 +42,19 @@ public class VideoPlayer implements SandwichPlayer,OnErrorListener {
 		player.setKeepScreenOn(true);
 		
 		// Start the media
+		waitDialog = SpinnerDialog.displayDialog(activity, "Please Wait", "Loading Media", true);
 		player.start();
 	}
 	
 	public void stop()
 	{
+		// Dismiss the wait dialog
+		if (waitDialog != null)
+		{
+			waitDialog.dismiss();
+			waitDialog = null;
+		}
+		
 		// Disable wakelock
 		player.setKeepScreenOn(false);
 		
@@ -57,7 +69,25 @@ public class VideoPlayer implements SandwichPlayer,OnErrorListener {
 	}
 	
 	@Override
-	public boolean onError(MediaPlayer player, int what, int extra) {
+	public boolean onError(MediaPlayer player, int what, int extra)
+	{
+		// Dismiss the wait dialog
+		if (waitDialog != null)
+		{
+			waitDialog.dismiss();
+			waitDialog = null;
+		}
 		return false;
+	}
+
+	@Override
+	public void onPrepared(MediaPlayer arg0)
+	{
+		// Dismiss the wait dialog
+		if (waitDialog != null)
+		{
+			waitDialog.dismiss();
+			waitDialog = null;
+		}
 	}
 }

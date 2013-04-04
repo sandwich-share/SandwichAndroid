@@ -3,6 +3,7 @@ package com.sandwich.player;
 import java.io.IOException;
 
 import com.sandwich.R;
+import com.sandwich.SpinnerDialog;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -30,6 +31,7 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 	private Button playpause;
 	private SeekBar seeker;
 	private TextView timeView;
+	private SpinnerDialog waitDialog;
 	
 	boolean touchActive = false;
 	
@@ -94,11 +96,19 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 	public void start()
 	{
 		// Prepare and start asynchronously
+		waitDialog = SpinnerDialog.displayDialog(activity, "Please Wait", "Loading Media", true);
 		player.prepareAsync();
 	}
 	
 	public void stop()
 	{
+		// Dismiss the wait dialog
+		if (waitDialog != null)
+		{
+			waitDialog.dismiss();
+			waitDialog = null;
+		}
+		
 		// Stop the player
 		player.stop();
 		
@@ -108,6 +118,13 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 	
 	public void release()
 	{
+		// Dismiss the wait dialog
+		if (waitDialog != null)
+		{
+			waitDialog.dismiss();
+			waitDialog = null;
+		}
+
 		// Release the player
 		player.release();
 		player = null;
@@ -115,6 +132,12 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 
 	@Override
 	public boolean onError(MediaPlayer mp, int what, int extra) {
+		// Dismiss the wait dialog
+		if (waitDialog != null)
+		{
+			waitDialog.dismiss();
+			waitDialog = null;
+		}
 		return false;
 	}
 
@@ -125,7 +148,14 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 
 	@Override
 	public void onPrepared(MediaPlayer mp)
-	{	
+	{
+		// Dismiss the wait dialog
+		if (waitDialog != null)
+		{
+			waitDialog.dismiss();
+			waitDialog = null;
+		}
+		
 		// Setup the progress bar with the duration of the media
 		seeker.setMax(player.getDuration());
 		seeker.setProgress(0);

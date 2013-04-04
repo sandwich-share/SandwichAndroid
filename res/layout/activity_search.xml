@@ -8,26 +8,16 @@
     android:paddingTop="@dimen/activity_vertical_margin"
     tools:context=".Search" >
 
-    <SearchView
-        android:id="@+id/fileSearchView"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentRight="true"
-        android:layout_alignParentTop="true" >
-
-    </SearchView>
-
     <ListView
         android:id="@+id/resultsListView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignLeft="@+id/fileSearchView"
         android:layout_alignParentBottom="true"
-        android:layout_alignRight="@+id/fileSearchView"
-        android:layout_below="@+id/fileSearchView"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentTop="true"
+        android:stackFromBottom="false"
         android:longClickable="false" >
-
     </ListView>
 
 </RelativeLayout>
