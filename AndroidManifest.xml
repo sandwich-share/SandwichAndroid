@@ -17,6 +17,11 @@
         android:hardwareAccelerated="true"
         android:icon="@drawable/ic_launcher"
         android:label="@string/app_name" >
+        <receiver android:name="com.sandwich.player.AudioEventReceiver">
+    		<intent-filter>
+        		<action android:name="android.intent.action.MEDIA_BUTTON" />
+    		</intent-filter>
+		</receiver>
         <activity
             android:name="com.sandwich.VideoPlayer"
             android:configChanges="orientation|screenSize"

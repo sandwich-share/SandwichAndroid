@@ -8,7 +8,9 @@ import com.sandwich.SpinnerDialog;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.Service;
+import android.content.ComponentName;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.net.Uri;
@@ -24,7 +26,8 @@ import android.widget.TextView;
 
 @SuppressLint("HandlerLeak")
 public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.OnErrorListener,
-	MediaPlayer.OnPreparedListener,OnClickListener,OnSeekBarChangeListener,MediaPlayer.OnCompletionListener {
+	MediaPlayer.OnPreparedListener,OnClickListener,OnSeekBarChangeListener,MediaPlayer.OnCompletionListener,
+	AudioManager.OnAudioFocusChangeListener  {
 
 	private Activity activity;
 	private MediaPlayer player;
@@ -33,9 +36,14 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 	private TextView timeView;
 	private SpinnerDialog waitDialog;
 	
+	private AudioManager am;
+
 	boolean touchActive = false;
 	
 	private Handler handler;
+	private IntentFilter noisyIntents = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+	
+	private AudioEventReceiver audioEventReceiver = new AudioEventReceiver(this);
 	
 	final static int SHOW_PROGRESS = 12813;
 	
@@ -81,6 +89,8 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 	{
 		player = new MediaPlayer();
 		
+		this.am = (AudioManager)activity.getSystemService(AUDIO_SERVICE);
+		
 		// Add listeners
 		playpause.setOnClickListener(this);
 		seeker.setOnSeekBarChangeListener(this);
@@ -91,6 +101,9 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 		player.setOnErrorListener(this);
 		player.setOnPreparedListener(this);
 		player.setOnCompletionListener(this);
+
+		// We want this activity's audio controls to change the music volume
+		activity.setVolumeControlStream(AudioManager.STREAM_MUSIC);
 	}
 	
 	public void start()
@@ -98,6 +111,26 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 		// Prepare and start asynchronously
 		waitDialog = SpinnerDialog.displayDialog(activity, "Please Wait", "Loading Media", true);
 		player.prepareAsync();
+	}
+	
+	public void play()
+	{
+		if (!player.isPlaying())
+		{
+			// Request audio focus
+			int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+			onAudioFocusChange(res);
+		}
+	}
+	
+	public void pause()
+	{
+		// Abandon audio focus
+		if (player.isPlaying())
+		{
+			am.abandonAudioFocus(this);
+			onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS);
+		}
 	}
 	
 	public void stop()
@@ -118,6 +151,9 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 	
 	public void release()
 	{
+		// Unregister our media button receiver
+		am.unregisterMediaButtonEventReceiver(new ComponentName(activity, AudioEventReceiver.class));
+		
 		// Dismiss the wait dialog
 		if (waitDialog != null)
 		{
@@ -159,15 +195,17 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 			waitDialog = null;
 		}
 		
+		// Register for media button events
+		am.registerMediaButtonEventReceiver(new ComponentName(activity, AudioEventReceiver.class));
+		
 		// Setup the progress bar with the duration of the media
 		seeker.setMax(player.getDuration());
 		seeker.setProgress(0);
-		
-		// Start playback
 		player.seekTo(0);
-		player.start();
-		handler.sendEmptyMessage(SHOW_PROGRESS);
-		playpause.setText("Pause");
+		
+		// Request audio focus
+		int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+		onAudioFocusChange(res);
 	}
 
 	@Override
@@ -176,15 +214,14 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 		// If it's playing, pause it. If it's paused, play it.
 		if (player.isPlaying())
 		{
-			player.pause();
-			handler.removeMessages(SHOW_PROGRESS);
-			playpause.setText("Play");
+			am.abandonAudioFocus(this);
+			onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS);
 		}
 		else
 		{
-			player.start();
-			handler.sendEmptyMessage(SHOW_PROGRESS);
-			playpause.setText("Pause");
+			// Request audio focus
+			int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+			onAudioFocusChange(res);
 		}
 	}
 
@@ -247,5 +284,36 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 		
 		// Set seeker to start
 		seeker.setProgress(0);
+		
+		// Give up audio focus
+		am.abandonAudioFocus(this);
+	}
+
+	@Override
+	public void onAudioFocusChange(int focusChange) {
+		// Check if we're losing focus
+		switch (focusChange)
+		{
+		case AudioManager.AUDIOFOCUS_LOSS:
+		case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+		case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+			// Stop playing
+			if (player.isPlaying())
+			{
+				activity.unregisterReceiver(audioEventReceiver);
+				player.pause();
+				handler.removeMessages(SHOW_PROGRESS);
+				playpause.setText("Play");
+			}
+			break;
+			
+		case AudioManager.AUDIOFOCUS_GAIN:
+			// Start playing
+			player.start();
+			handler.sendEmptyMessage(SHOW_PROGRESS);
+			playpause.setText("Pause");
+			activity.registerReceiver(audioEventReceiver, noisyIntents);
+			break;
+		}
 	}
 }
