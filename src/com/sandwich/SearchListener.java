@@ -70,7 +70,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 
 	@Override
 	// Called when an item within the list view is clicked
-	public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+	public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
 		TextView row = (TextView) view;
 		String resultTuple[] = row.getText().toString().split(" - ");
 		
@@ -79,7 +79,11 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 			sandwichClient.startFileDownloadFromPeer(resultTuple[0], resultTuple[1]);
 		} catch (Exception e) {
 			Dialog.displayDialog(activity, "Download Error", e.getMessage(), false);
+			return true;
 		}
+		
+		// Already handled
+		return true;
 	}
 
 	
@@ -107,7 +111,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	}
 
 	@Override
-	public boolean onItemLongClick(AdapterView<?> adapterView, View view, int position, long id) {
+	public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
 		TextView row = (TextView) view;
 		String resultTuple[] = row.getText().toString().split(" - ");
 		
@@ -117,10 +121,6 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		} catch (Exception e) {
 			e.printStackTrace();
 			Dialog.displayDialog(activity, "Streaming Error", e.getMessage(), false);
-			return true;
 		}
-		
-		// We handled the item already
-		return true;
 	}
 }

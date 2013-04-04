@@ -13,8 +13,14 @@ public class PeerSet {
 	
 	public synchronized void updatePeerSet(PeerSet peers)
 	{
+		// Clear peer set first
 		peerSet.clear();
-		peerSet.addAll(peers.peerSet);
+		
+		// Add a copy of each peer into our peer set
+		for (Peer p : peers.peerSet)
+		{
+			peerSet.add(new Peer(p));
+		}
 	}
 	
 	public synchronized boolean addPeer(String ip, String timestamp, long indexHash)
@@ -69,6 +75,13 @@ public class PeerSet {
 		{
 			this.ip = ip;
 			this.indexHash = indexHash;
+			this.peerSet = null;
+		}
+		
+		public Peer(Peer p)
+		{
+			this.ip = p.ip;
+			this.indexHash = p.indexHash;
 			this.peerSet = null;
 		}
 		
