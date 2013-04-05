@@ -27,18 +27,23 @@ public class Search extends Activity {
         bootstrapper.initialize();
 	}
 	
-    @Override
-    public void onStart()
-    {
-    	super.onStart();
-        
+	@Override
+	public boolean onSearchRequested()
+	{
         // Start the bootstrapping process if it's not already running
     	if (thread == null || thread.getState() == Thread.State.TERMINATED)
     	{
     		thread = new Thread(bootstrapper);
     		thread.start();
     	}
-    	
+		
+		return super.onSearchRequested();
+	}
+	
+    @Override
+    public void onStart()
+    {
+    	super.onStart();
     	this.onSearchRequested();
     }
     
