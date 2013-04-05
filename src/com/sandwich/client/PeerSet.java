@@ -19,14 +19,12 @@ public class PeerSet {
 		// Add a copy of each peer into our peer set
 		for (Peer p : peers.peerSet)
 		{
-			peerSet.add(new Peer(p));
+			addPeer(new Peer(p));
 		}
 	}
 	
-	public synchronized boolean addPeer(String ip, String timestamp, long indexHash)
+	public synchronized boolean addPeer(Peer p)
 	{
-		Peer p = new Peer(ip, timestamp, indexHash);
-
 		if (peerSet.add(p))
 		{
 			p.setPeerSet(this);
@@ -34,6 +32,11 @@ public class PeerSet {
 		}
 		
 		return false;
+	}
+	
+	public synchronized boolean addPeer(String ip, String timestamp, long indexHash)
+	{
+		return addPeer(new Peer(ip, timestamp, indexHash));
 	}
 	
 	public synchronized boolean removePeer(String ip)
@@ -52,7 +55,7 @@ public class PeerSet {
 			p.setPeerSet(null);
 			return true;
 		}
-		
+
 		return false;
 	}
 	

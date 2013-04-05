@@ -244,10 +244,9 @@ public class Client {
 		// Delete them from the peer table first
 		database.beginTransaction();
 		try {
-			database.delete(PEER_TABLE, "IP=?", new String[] {peer.getIpAddress()});
-			System.out.println("Dropped peers row for: "+peer.getIpAddress());
+			ret = database.delete(PEER_TABLE, "IP=?", new String[] {peer.getIpAddress()}) > 0;
+			System.out.println("Dropped peers row for: "+peer.getIpAddress()+" ("+ret+")");
 			database.setTransactionSuccessful();
-			ret = true;
 		} catch (SQLiteException e) {
 			// It's ok for this to fail
 		} finally {
@@ -447,6 +446,7 @@ public class Client {
 		
 		databaseCreated = !doesDatabaseExist(context, PEER_DB);
 		database = getDatabase(context, PEER_DB);
+		threadList = new ArrayList<Thread>();
 		
 		try {
 			// Create our table if it's a new database
@@ -457,7 +457,6 @@ public class Client {
 			
 			// Iterate the peer list and download indexes for each
 			iterator = peers.getPeerListIterator();
-			threadList = new ArrayList<Thread>();
 			while (iterator.hasNext())
 			{
 				PeerSet.Peer peer = iterator.next();
@@ -477,12 +476,12 @@ public class Client {
 				threadList.add(startDownloadIndexThreadForPeer(database, peer));
 			}
 			
+			System.out.println("Bootstrapped");
+		} finally {
 			// Wait for downloads to finish
 			for (Thread t : threadList)
 				t.join();
 			
-			System.out.println("Bootstrapped");
-		} finally {
 			// Release the initial reference
 			database.close();
 		}
