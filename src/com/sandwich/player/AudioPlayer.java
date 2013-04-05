@@ -135,22 +135,6 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 	
 	public void stop()
 	{
-		// Dismiss the wait dialog
-		if (waitDialog != null)
-		{
-			waitDialog.dismiss();
-			waitDialog = null;
-		}
-		
-		// Stop the player
-		player.stop();
-		
-		// Stop progress bar updates
-		handler.removeMessages(SHOW_PROGRESS);
-	}
-	
-	public void release()
-	{
 		// Unregister our media button receiver
 		am.unregisterMediaButtonEventReceiver(new ComponentName(activity, AudioEventReceiver.class));
 		
@@ -160,6 +144,23 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 			waitDialog.dismiss();
 			waitDialog = null;
 		}
+		
+		// Drop audio focus and stop
+		if (player.isPlaying())
+		{
+			am.abandonAudioFocus(this);
+			onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS);
+			player.stop();
+		}
+		
+		// Stop progress bar updates
+		handler.removeMessages(SHOW_PROGRESS);
+	}
+	
+	public void release()
+	{
+		// Stop the player first
+		stop();
 
 		// Release the player
 		player.release();
@@ -282,6 +283,9 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 		handler.removeMessages(SHOW_PROGRESS);
 		playpause.setText("Play");
 		
+		// Unregister audio events
+		activity.unregisterReceiver(audioEventReceiver);
+		
 		// Set seeker to start
 		seeker.setProgress(0);
 		
@@ -308,11 +312,14 @@ public class AudioPlayer extends Service implements SandwichPlayer,MediaPlayer.O
 			break;
 			
 		case AudioManager.AUDIOFOCUS_GAIN:
-			// Start playing
-			player.start();
-			handler.sendEmptyMessage(SHOW_PROGRESS);
-			playpause.setText("Pause");
-			activity.registerReceiver(audioEventReceiver, noisyIntents);
+			if (!player.isPlaying())
+			{
+				// Start playing
+				player.start();
+				handler.sendEmptyMessage(SHOW_PROGRESS);
+				playpause.setText("Pause");
+				activity.registerReceiver(audioEventReceiver, noisyIntents);
+			}
 			break;
 		}
 	}

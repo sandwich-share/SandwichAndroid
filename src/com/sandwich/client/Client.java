@@ -455,25 +455,29 @@ public class Client {
 				database.execSQL(CREATE_PEER_TABLE);
 			}
 			
-			// Iterate the peer list and download indexes for each
-			iterator = peers.getPeerListIterator();
-			while (iterator.hasNext())
-			{
-				PeerSet.Peer peer = iterator.next();
-				long oldHash;
-				
-				// Check if the old index hash is valid
-				oldHash = getOldHashOfPeerIndex(database, peer);
-				if (oldHash == peer.getIndexHash())
+			// We have to do this in a synchronized block so our index download threads
+			// can't touch it while we're downloading
+			synchronized (peers) {
+				// Iterate the peer list and download indexes for each
+				iterator = peers.getPeerListIterator();
+				while (iterator.hasNext())
 				{
-					System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
+					PeerSet.Peer peer = iterator.next();
+					long oldHash;
 					
-					// Don't download anything
-					continue;
+					// Check if the old index hash is valid
+					oldHash = getOldHashOfPeerIndex(database, peer);
+					if (oldHash == peer.getIndexHash())
+					{
+						System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
+						
+						// Don't download anything
+						continue;
+					}
+					
+					// We need to download the updated index
+					threadList.add(startDownloadIndexThreadForPeer(database, peer));
 				}
-				
-				// We need to download the updated index
-				threadList.add(startDownloadIndexThreadForPeer(database, peer));
 			}
 			
 			System.out.println("Bootstrapped");
@@ -491,29 +495,27 @@ public class Client {
 	public void beginSearch(String query, ResultListener listener) throws IOException, InterruptedException
 	{
 		ArrayList<Thread> threads = new ArrayList<Thread>();
-		ArrayList<PeerSet.Peer> peersToReap = new ArrayList<PeerSet.Peer>();
 		
 		if (peers == null)
 		{
 			throw new IllegalStateException("Not bootstrapped");
 		}
 		
-		// Start search threads for each peer
-		Iterator<PeerSet.Peer> peerIterator = peers.getPeerListIterator();
-		while (peerIterator.hasNext())
-		{
-			PeerSet.Peer peer = peerIterator.next();
+		// Make sure the peer list isn't modified by the search threads while we're iterating
+		synchronized (peers) {
+			// Start search threads for each peer
+			Iterator<PeerSet.Peer> peerIterator = peers.getPeerListIterator();
+			while (peerIterator.hasNext())
+			{
+				PeerSet.Peer peer = peerIterator.next();
 
-			// Start the search thread
-			System.out.println("Spawning thread to search "+peer.getIpAddress());
-			Thread t = new Thread(new SearchThread(context, listener, peer, query, getDatabase(context, PEER_DB)));
-			threads.add(t);
-			t.start();
+				// Start the search thread
+				System.out.println("Spawning thread to search "+peer.getIpAddress());
+				Thread t = new Thread(new SearchThread(context, listener, peer, query, getDatabase(context, PEER_DB)));
+				threads.add(t);
+				t.start();
+			}
 		}
-		
-		// Reap all dead peers
-		for (PeerSet.Peer p : peersToReap)
-			p.remove();
 	}
 
 	@TargetApi(11)
@@ -727,7 +729,7 @@ class IndexDownloadThread implements Runnable {
 			
 			System.out.println("Index for "+peer.getIpAddress()+" downloaded (hash: "+peer.getIndexHash()+")");
 		} catch (Exception e) {
-			e.printStackTrace();
+			System.err.println(e.getMessage());
 			
 			// Remove this peer from the peer set
 			peer.remove();
@@ -778,7 +780,7 @@ class SearchThread implements Runnable {
 			}
 			c.close();
 		} catch (SQLiteException e) {
-			e.printStackTrace();
+			System.err.println(e.getMessage());
 			
 			// Remove this peer from the peer set
 			peer.remove();
