@@ -222,7 +222,7 @@ public class Client {
 	
 	private Thread startDownloadIndexThreadForPeer(SQLiteDatabase database, PeerSet.Peer peer)
 	{
-		Thread t = new Thread(new IndexDownloadThread(database, peer));
+		Thread t = new IndexDownloadThread(database, peer);
 		t.start();
 		return t;
 	}
