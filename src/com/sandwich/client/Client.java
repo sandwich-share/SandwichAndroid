@@ -249,27 +249,19 @@ public class Client {
 		boolean ret = false;
 		
 		// Delete them from the peer table first
-		database.beginTransaction();
 		try {
 			ret = database.delete(PEER_TABLE, "IP=?", new String[] {peer.getIpAddress()}) > 0;
 			System.out.println("Dropped peers row for: "+peer.getIpAddress()+" ("+ret+")");
-			database.setTransactionSuccessful();
 		} catch (SQLiteException e) {
 			// It's ok for this to fail
-		} finally {
-			database.endTransaction();
 		}
 		
 		// Delete their index table
-		database.beginTransaction();
 		try {
 			database.execSQL("DROP TABLE "+getTableNameForPeer(peer));
 			System.out.println("Dropped index table for: "+peer.getIpAddress());
-			database.setTransactionSuccessful();
 		} catch (SQLiteException e) {
 			// It's ok for this to fail
-		} finally {
-			database.endTransaction();
 		}
 		
 		return ret;
@@ -329,13 +321,7 @@ public class Client {
 		// Create our table if it's a new database
 		if (databaseCreated)
 		{
-			database.beginTransaction();
-			try {
-				database.execSQL(CREATE_PEER_TABLE);
-				database.setTransactionSuccessful();
-			} finally {
-				database.endTransaction();
-			}
+			database.execSQL(CREATE_PEER_TABLE);
 		}
 	}
 	
@@ -511,20 +497,23 @@ public class Client {
 				PeerSet.Peer peer = iterator.next();
 				long oldHash;
 				
-				// Check if the old index hash is valid
-				oldHash = getOldHashOfPeerIndex(database, peer);
-				if (oldHash == peer.getIndexHash())
-				{
-					System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
-					
-					// Don't download anything
-					continue;
-				}
-				
-				// Spawn an updater thread if one doesn't already exist
 				synchronized (indexDownloadThreads) {
+					// Check if an updater is already running for this peer
 					if (!indexDownloadThreads.containsKey(peer))
+					{
+						// Check if the old index hash is valid
+						oldHash = getOldHashOfPeerIndex(database, peer);
+						if (oldHash == peer.getIndexHash())
+						{
+							System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
+							
+							// Don't download anything
+							continue;
+						}
+						
+						// No updater running and index is not up to date
 						indexDownloadThreads.put(peer, startDownloadIndexThreadForPeer(database, peer));
+					}
 				}
 			}
 		}
@@ -689,13 +678,7 @@ class IndexDownloadThread extends Thread {
 			in = Client.getInputStreamFromConnection(conn);
 			
 			// Create the required table
-			database.beginTransaction();
-			try {
-				database.execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY);");
-				database.setTransactionSuccessful();
-			} finally {
-				database.endTransaction();
-			}
+			database.execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY);");
 			
 			// Read from the GET response
 			JsonReader reader = new JsonReader(new InputStreamReader(in));
@@ -743,14 +726,8 @@ class IndexDownloadThread extends Thread {
 							// If file object had data, add it
 							if (vals.size() != 0)
 							{
-								database.beginTransaction();
-								try {
-									// Insert it into the database
-									database.insertWithOnConflict(Client.getTableNameForPeer(peer), null, vals, SQLiteDatabase.CONFLICT_REPLACE);
-									database.setTransactionSuccessful();
-								} finally {
-									database.endTransaction();
-								}
+								// Insert it into the database
+								database.insertWithOnConflict(Client.getTableNameForPeer(peer), null, vals, SQLiteDatabase.CONFLICT_REPLACE);
 							}
 							
 							// If we've been interrupted, let's die
@@ -782,28 +759,20 @@ class IndexDownloadThread extends Thread {
 			vals.put("IP", peer.getIpAddress());
 			vals.put("IndexHash", ""+peer.getIndexHash());
 			
-			try {
-				oldHash = Client.getOldHashOfPeerIndex(database, peer);
-				if (oldHash == -1)
-				{
-					System.out.println(peer.getIpAddress()+" has never been seen before (new hash: "+peer.getIndexHash()+")");
+			oldHash = Client.getOldHashOfPeerIndex(database, peer);
+			if (oldHash == -1)
+			{
+				System.out.println(peer.getIpAddress()+" has never been seen before (new hash: "+peer.getIndexHash()+")");
 
-					// We need to insert this into the list
-					database.beginTransaction();
-					database.insert(Client.PEER_TABLE, null, vals);
-				}
-				else
-				{
-					System.out.println(peer.getIpAddress()+" has a newer index (old hash: "+oldHash+" | new hash: "+peer.getIndexHash()+")");
+				// We need to insert this into the list
+				database.insert(Client.PEER_TABLE, null, vals);
+			}
+			else
+			{
+				System.out.println(peer.getIpAddress()+" has a newer index (old hash: "+oldHash+" | new hash: "+peer.getIndexHash()+")");
 
-					// We need to replace this peer's existing values
-					database.beginTransaction();
-					database.replace(Client.PEER_TABLE, null, vals);
-				}
-				
-				database.setTransactionSuccessful();
-			} finally {
-				database.endTransaction();
+				// We need to replace this peer's existing values
+				database.replace(Client.PEER_TABLE, null, vals);
 			}
 			
 			System.out.println("Index for "+peer.getIpAddress()+" downloaded (hash: "+peer.getIndexHash()+")");
