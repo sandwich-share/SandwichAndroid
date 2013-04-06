@@ -32,6 +32,7 @@ public class BootstrapThread implements Runnable {
     	
     	// Create the client
     	client = new Client(activity);
+    	client.initialize();
 		
         // Create our search listener
         listener = new SearchListener(activity, client);
@@ -44,6 +45,14 @@ public class BootstrapThread implements Runnable {
         
         // Bootstrap from the cache initially
         bootstrapped = client.bootstrapFromCache();
+	}
+	
+	public void release()
+	{
+		if (client != null)
+		{
+			client.release();
+		}
 	}
 	
 	@Override

@@ -43,6 +43,9 @@ import android.os.Environment;
 public class Client {
 	private Context context;
 	private PeerSet peers;
+	private SQLiteDatabase database;
+	
+	private ArrayList<Thread> searchThreads;
 	
 	private static final String CREATE_PEER_TABLE = "CREATE TABLE peers (IP TEXT PRIMARY KEY, IndexHash INT);";
 
@@ -54,6 +57,7 @@ public class Client {
 	public Client(Context context)
 	{
 		this.context = context;
+		this.searchThreads = new ArrayList<Thread>();
 		this.peers = new PeerSet();
 	}
 	
@@ -215,7 +219,7 @@ public class Client {
 	
 	private Thread startDownloadIndexThreadForPeer(SQLiteDatabase database, PeerSet.Peer peer)
 	{
-		Thread t = new Thread(new IndexDownloadThread(database, context, peer));
+		Thread t = new Thread(new IndexDownloadThread(database, peer));
 		t.start();
 		return t;
 	}
@@ -295,44 +299,47 @@ public class Client {
 		return -1;
 	}
 	
-	static boolean doesDatabaseExist(Context context, String dbname)
+	public void initialize()
 	{
-		// FIXME: See if there's a better way to do this
+		boolean databaseCreated;
 		
+		// Check if the database already exists
+		databaseCreated = true;
 		for (String db : context.databaseList())
-			if (db.equals(dbname))
-				return true;
+		{
+			if (db.equals(PEER_DB))
+			{
+				databaseCreated = false;
+				break;
+			}
+		}
+
+		// Open or create it
+		database = context.openOrCreateDatabase(PEER_DB, Context.MODE_PRIVATE, null);
 		
-		return false;
+		// Create our table if it's a new database
+		if (databaseCreated)
+		{
+			database.execSQL(CREATE_PEER_TABLE);
+		}
 	}
 	
-	static SQLiteDatabase getDatabase(Context context, String dbname)
+	public void release()
 	{
-		SQLiteDatabase database;
+		// Kill search threads before releasing
+		try {
+			endSearch();
+		} catch (InterruptedException e) { }
 		
-		// Open our database
-		database = context.openOrCreateDatabase(dbname, Context.MODE_PRIVATE, null);
-		
-		return database;
+		if (database != null)
+			database.close();
 	}
 	
 	private boolean readCachedBootstrapData()
 	{
-		SQLiteDatabase database;
 		boolean success;
-		
-		// If it doesn't exist, we have no cache to read
-		if (!doesDatabaseExist(context, PEER_DB))
-			return false;
-		
+
 		System.out.println("Loading cached bootstrap data");
-		
-		try {
-			database = getDatabase(context, PEER_DB);
-		} catch (SQLiteException e) {
-			// Couldn't read the DB, so cached bootstrap fails
-			return false;
-		}
 		
 		try {
 			// Try to read the peer set from the database
@@ -341,11 +348,8 @@ public class Client {
 		} catch (SQLiteException e) {
 			// Failed to read peer set
 			success = false;
-		} finally {
-			// Close the database
-			database.close();
 		}
-		
+
 		return success;
 	}
 	
@@ -405,9 +409,7 @@ public class Client {
 				selectedPeer.remove();
 				
 				// Drop it from the database
-				SQLiteDatabase db = getDatabase(context, PEER_DB);
-				Client.deletePeerFromDatabase(db, selectedPeer);
-				db.close();
+				Client.deletePeerFromDatabase(database, selectedPeer);
 			}
 		}
 
@@ -435,8 +437,6 @@ public class Client {
 	{
 		Iterator<PeerSet.Peer> iterator;
 		ArrayList<Thread> threadList;
-		SQLiteDatabase database;
-		boolean databaseCreated;
 
 		// Download the peer list
 		if (!downloadPeerList(initialPeer))
@@ -444,17 +444,9 @@ public class Client {
 			throw new IllegalStateException("No peers available");
 		}
 		
-		databaseCreated = !doesDatabaseExist(context, PEER_DB);
-		database = getDatabase(context, PEER_DB);
 		threadList = new ArrayList<Thread>();
 		
 		try {
-			// Create our table if it's a new database
-			if (databaseCreated)
-			{
-				database.execSQL(CREATE_PEER_TABLE);
-			}
-			
 			// We have to do this in a synchronized block so our index download threads
 			// can't touch it while we're downloading
 			synchronized (peers) {
@@ -485,21 +477,39 @@ public class Client {
 			// Wait for downloads to finish
 			for (Thread t : threadList)
 				t.join();
-			
-			// Release the initial reference
-			database.close();
 		}
 
 	}
 	
-	public void beginSearch(String query, ResultListener listener) throws IOException, InterruptedException
+	public void endSearch() throws InterruptedException
 	{
-		ArrayList<Thread> threads = new ArrayList<Thread>();
-		
+		synchronized (searchThreads) {	
+			// Interrupt existing search threads
+			for (Thread t : searchThreads)
+			{
+				t.interrupt();
+			}
+			
+			// Wait for them to die
+			for (Thread t : searchThreads)
+			{
+				t.join();
+			}
+
+			// Clear search threads
+			searchThreads.clear();
+		}
+	}
+	
+	public void beginSearch(String query, ResultListener listener) throws IOException, InterruptedException
+	{		
 		if (peers == null)
 		{
 			throw new IllegalStateException("Not bootstrapped");
 		}
+		
+		// End an existing search
+		endSearch();
 		
 		// Make sure the peer list isn't modified by the search threads while we're iterating
 		synchronized (peers) {
@@ -511,8 +521,8 @@ public class Client {
 
 				// Start the search thread
 				System.out.println("Spawning thread to search "+peer.getIpAddress());
-				Thread t = new Thread(new SearchThread(context, listener, peer, query, getDatabase(context, PEER_DB)));
-				threads.add(t);
+				Thread t = new SearchThread(database, peer, listener, query);
+				searchThreads.add(t);
 				t.start();
 			}
 		}
@@ -594,15 +604,13 @@ public class Client {
 }
 
 class IndexDownloadThread implements Runnable {
-	Context context;
-	PeerSet.Peer peer;
 	SQLiteDatabase database;
+	PeerSet.Peer peer;
 	
-	public IndexDownloadThread(SQLiteDatabase database, Context context, PeerSet.Peer peer)
+	public IndexDownloadThread(SQLiteDatabase database, PeerSet.Peer peer)
 	{
-		this.context = context;
-		this.peer = peer;
 		this.database = database;
+		this.peer = peer;
 	}
 
 	@Override
@@ -632,69 +640,67 @@ class IndexDownloadThread implements Runnable {
 			
 			// Read from the GET response
 			JsonReader reader = new JsonReader(new InputStreamReader(in));
-			database.beginTransaction();
-			try {
-				// Start reading the index object
-				reader.beginObject();
-				
-				// Read the index object
-				while (reader.hasNext())
+			
+			// Start reading the index object
+			reader.beginObject();
+			
+			// Read the index object
+			while (reader.hasNext())
+			{
+				String ioname = reader.nextName();
+				if (ioname.equals("List"))
 				{
-					String ioname = reader.nextName();
-					if (ioname.equals("List"))
+					// Now start reading the array
+					reader.beginArray();
+					
+					while (reader.hasNext())
 					{
-						// Now start reading the array
-						reader.beginArray();
+						String file = null;
 						
+						// Start reading the file object
+						reader.beginObject();
+						ContentValues vals = new ContentValues();
+						
+						// Read the file object
 						while (reader.hasNext())
 						{
-							// Start reading the file object
-							reader.beginObject();
-							ContentValues vals = new ContentValues();
-							
-							// Read the file object
-							while (reader.hasNext())
+							String foname = reader.nextName();
+							if (foname.equals("FileName"))
 							{
-								String foname = reader.nextName();
-								if (foname.equals("FileName"))
-								{
-									// Read the file name
-									String file = reader.nextString();
-									vals.put("FileName", file);
-								}
-								else
-								{
-									// Otherwise just skip it
-									reader.skipValue();
-								}
+								// Read the file name
+								file = reader.nextString();
+								vals.put("FileName", file);
 							}
-							
-							// End of file object
-							reader.endObject();
-							
+							else
+							{
+								// Otherwise just skip it
+								reader.skipValue();
+							}
+						}
+						
+						// End of file object
+						reader.endObject();
+						
+						// If file object had data, add it
+						if (vals.size() != 0)
+						{
 							// Insert it into the database
 							database.insertWithOnConflict(Client.getTableNameForPeer(peer), null, vals, SQLiteDatabase.CONFLICT_REPLACE);
 						}
-						
-						// Done reading array
-						reader.endArray();
 					}
-					else
-					{
-						// Skip it
-						reader.skipValue();
-					}
+					
+					// Done reading array
+					reader.endArray();
 				}
-
-				// End of index object
-				reader.endObject();
-				
-				// Transaction successful
-				database.setTransactionSuccessful();
-			} finally {
-				// Transaction not successful
-				database.endTransaction();
+				else
+				{
+					// Skip it
+					reader.skipValue();
+				}
 			}
+
+			// End of index object
+			reader.endObject();
 			
 			// Close the GET request input stream
 			in.close();
@@ -749,20 +755,18 @@ class IndexDownloadThread implements Runnable {
 	}
 }
 
-class SearchThread implements Runnable {
-	String query;
+class SearchThread extends Thread {
 	PeerSet.Peer peer;
-	ResultListener listener;
-	Context context;
 	SQLiteDatabase database;
+	String query;
+	ResultListener listener;
 	
-	public SearchThread(Context context, ResultListener listener, PeerSet.Peer peer, String query, SQLiteDatabase database)
+	public SearchThread(SQLiteDatabase database, PeerSet.Peer peer, ResultListener listener, String query)
 	{
-		this.context = context;
-		this.listener = listener;
-		this.query = query;
-		this.peer = peer;
 		this.database = database;
+		this.peer = peer;
+		this.query = query;
+		this.listener = listener;
 	}
 
 	@Override
@@ -775,7 +779,13 @@ class SearchThread implements Runnable {
 			while (!c.isAfterLast())
 			{
 				String file = c.getString(0);
-				listener.foundResult(query, peer.getIpAddress(), file);
+				if (!isInterrupted())
+					listener.foundResult(query, peer.getIpAddress(), file);
+				else
+				{
+					System.out.println("Search on "+peer.getIpAddress()+" was interrupted");
+					break;
+				}
 				c.moveToNext();
 			}
 			c.close();
@@ -787,9 +797,6 @@ class SearchThread implements Runnable {
 			
 			// Drop them from the database
 			Client.deletePeerFromDatabase(database, peer);
-		} finally {
-			// Dereference the database
-			database.close();
 		}
 	}
 }

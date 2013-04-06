@@ -51,6 +51,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		try {
 			sandwichClient.beginSearch(query, this);
 		} catch (Exception e) {
+			e.printStackTrace();
 			Dialog.displayDialog(activity, "Search Error", e.getMessage(), false);
 		}
 		

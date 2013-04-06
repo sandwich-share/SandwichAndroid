@@ -58,6 +58,7 @@ public class Search extends Activity {
     {
     	super.onDestroy();
     	
+    	bootstrapper.release();
     	Dialog.closeDialogs();
     	SpinnerDialog.closeDialogs();
     }
