@@ -258,7 +258,7 @@ public class Client {
 		
 		// Delete their index table
 		try {
-			database.execSQL("DROP TABLE "+getTableNameForPeer(peer));
+			database.execSQL("DROP TABLE IF EXISTS"+getTableNameForPeer(peer));
 			System.out.println("Dropped index table for: "+peer.getIpAddress());
 		} catch (SQLiteException e) {
 			// It's ok for this to fail
@@ -777,7 +777,7 @@ class IndexDownloadThread extends Thread {
 			
 			System.out.println("Index for "+peer.getIpAddress()+" downloaded (hash: "+peer.getIndexHash()+")");
 		} catch (Exception e) {
-			System.err.println(e.getMessage());
+			System.out.println("Failed to download index for peer: "+peer.getIpAddress());
 			
 			// Remove this peer from the peer set
 			peer.remove();
@@ -832,7 +832,7 @@ class SearchThread extends Thread {
 			}
 			c.close();
 		} catch (SQLiteException e) {
-			System.err.println(e.getMessage());
+			System.out.println("Failed to search index for peer: "+peer.getIpAddress());
 			
 			// Remove this peer from the peer set
 			peer.remove();
