@@ -1,12 +1,14 @@
 package com.sandwich.player;
 
 import java.io.IOException;
+import java.util.HashMap;
 
 import com.sandwich.Dialog;
 import com.sandwich.R;
 import com.sandwich.SpinnerDialog;
 
 import android.annotation.SuppressLint;
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.Notification;
 import android.app.PendingIntent;
@@ -15,16 +17,20 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.graphics.BitmapFactory;
 import android.media.AudioManager;
+import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
 import android.net.Uri;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
@@ -32,7 +38,7 @@ import android.widget.TextView;
 @SuppressLint("HandlerLeak")
 public class AudioPlayerService extends Service implements MediaPlayer.OnErrorListener,
 	MediaPlayer.OnPreparedListener,OnClickListener,OnSeekBarChangeListener,MediaPlayer.OnCompletionListener,
-	AudioManager.OnAudioFocusChangeListener  {
+	AudioManager.OnAudioFocusChangeListener,Runnable  {
 
 	private Activity activity;
 	private MediaPlayer player;
@@ -42,8 +48,17 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 	private SpinnerDialog waitDialog;
 	
 	private AudioManager am;
+	
+	private Uri filePath;
 
 	boolean touchActive = false;
+	
+	private Thread metadataThread;
+	
+	private PendingIntent pi;
+	
+	private String metastring = "";
+	private byte[] albumart = null;
 	
 	private Handler handler;
 	private IntentFilter noisyIntents = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
@@ -66,6 +81,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		public void initialize(Activity activity, Uri filePath) throws IllegalArgumentException, SecurityException, IllegalStateException, IOException
 		{
 			service.activity = activity;
+			service.filePath = filePath;
 
 			service.seeker = (SeekBar)activity.findViewById(R.id.seekBar);
 			service.playpause = (Button)activity.findViewById(R.id.playButton);
@@ -183,6 +199,15 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			
 			// Delete the notification
 			service.stopForeground(true);
+			
+			// Stop the metadata thread
+			if (metadataThread != null)
+			{
+				try {
+					metadataThread.join();
+				} catch (InterruptedException e) { }
+				metadataThread = null;
+			}
 
 			// Release the player
 			player.release();
@@ -224,9 +249,39 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		Dialog.displayDialog(activity, "Streaming Error", error, true);
 		return true;
 	}
-
+	
+	@TargetApi(Build.VERSION_CODES.ICE_CREAM_SANDWICH)
 	@SuppressWarnings("deprecation")
 	@Override
+	public void run()
+	{
+		String artist;
+		String title;
+		
+		// Pull metadata for this file
+		MediaMetadataRetriever metagetter = new MediaMetadataRetriever();
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH)
+			metagetter.setDataSource(filePath.toString(), new HashMap<String, String>());
+		else
+			metagetter.setDataSource(activity, filePath);
+
+		artist = metagetter.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
+		title = metagetter.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+		
+		Notification notification = new Notification();
+		notification.tickerText = "Sandwich Audio Player";
+		notification.icon = R.drawable.ic_launcher;
+		notification.flags |= Notification.FLAG_ONGOING_EVENT;
+		notification.setLatestEventInfo(activity.getApplicationContext(), "Sandwich Audio Player",
+                artist + " - " + title, pi);
+		startForeground(NOTIFICATION_ID, notification);
+		
+		metastring = artist + " - " + title;
+		albumart = metagetter.getEmbeddedPicture();
+	}
+
+	@Override
+	@SuppressWarnings("deprecation")
 	public void onPrepared(MediaPlayer mp)
 	{
 		// Dismiss the wait dialog
@@ -236,7 +291,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			waitDialog = null;
 		}
 		
-		PendingIntent pi = PendingIntent.getActivity(activity.getApplicationContext(), 0,
+		pi = PendingIntent.getActivity(activity.getApplicationContext(), 0,
                 new Intent(activity.getApplicationContext(), com.sandwich.AudioPlayer.class),
                 PendingIntent.FLAG_UPDATE_CURRENT);
 		Notification notification = new Notification();
@@ -258,6 +313,10 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		// Request audio focus
 		int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
 		onAudioFocusChange(res);
+		
+		// Start a thread to get the metadata
+		metadataThread = new Thread(this);
+		metadataThread.start();
 	}
 
 	@Override
@@ -309,6 +368,18 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 
 		// Update the text in the text view
 		timeView.setText(time);
+		
+		// Update the metadata
+		if (metastring != null) {
+			TextView metaText = (TextView)activity.findViewById(R.id.songText);
+			metaText.setText(metastring);
+			metastring = null;
+		}
+		if (albumart != null) {
+			ImageView artView = (ImageView)activity.findViewById(R.id.albumArt);
+			artView.setImageBitmap(BitmapFactory.decodeByteArray(albumart, 0, albumart.length));
+			albumart = null;
+		}
 	}
 
 	@Override

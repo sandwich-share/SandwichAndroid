@@ -33,4 +33,24 @@
         android:text="00:00 / 00:00"
         android:textAppearance="?android:attr/textAppearanceLarge" />
 
+    <TextView
+        android:id="@+id/songText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/timeView"
+        android:layout_alignLeft="@+id/seekBar"
+        android:layout_alignRight="@+id/seekBar"
+        android:layout_centerHorizontal="true"
+        android:gravity="center"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <ImageView
+        android:id="@+id/albumArt"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_above="@+id/songText"
+        android:layout_alignLeft="@+id/songText"
+        android:layout_alignParentTop="true"
+        android:layout_alignRight="@+id/songText" />
+
 </RelativeLayout>
