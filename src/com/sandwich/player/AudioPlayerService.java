@@ -263,7 +263,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH)
 			metagetter.setDataSource(filePath.toString(), new HashMap<String, String>());
 		else
-			metagetter.setDataSource(activity, filePath);
+			metagetter.setDataSource(filePath.toString());
 
 		artist = metagetter.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
 		title = metagetter.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);

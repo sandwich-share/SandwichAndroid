@@ -299,6 +299,7 @@ public class Client {
 		return -1;
 	}
 	
+	@TargetApi(Build.VERSION_CODES.HONEYCOMB)
 	public void initialize()
 	{
 		boolean databaseCreated;
@@ -316,19 +317,36 @@ public class Client {
 
 		// Open or create it
 		database = context.openOrCreateDatabase(PEER_DB, Context.MODE_PRIVATE, null);
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+		{
+			// Enable write-ahead logging if possible
+			database.enableWriteAheadLogging();
+		}
 		
 		// Create our table if it's a new database
 		if (databaseCreated)
 		{
-			database.execSQL(CREATE_PEER_TABLE);
+			database.beginTransaction();
+			try {
+				database.execSQL(CREATE_PEER_TABLE);
+				database.setTransactionSuccessful();
+			} finally {
+				database.endTransaction();
+			}
 		}
 	}
 	
 	public void release()
 	{
-		// Kill search threads before releasing
+		// Start killing of search threads
+		endSearch();
+		
 		try {
-			endSearch();
+			// Wait for them to die
+			for (Thread t : searchThreads)
+			{
+				t.join();
+			}
 		} catch (InterruptedException e) { }
 		
 		if (database != null)
@@ -481,7 +499,7 @@ public class Client {
 
 	}
 	
-	public void endSearch() throws InterruptedException
+	public void endSearch()
 	{
 		synchronized (searchThreads) {	
 			// Interrupt existing search threads
@@ -489,19 +507,10 @@ public class Client {
 			{
 				t.interrupt();
 			}
-			
-			// Wait for them to die
-			for (Thread t : searchThreads)
-			{
-				t.join();
-			}
-
-			// Clear search threads
-			searchThreads.clear();
 		}
 	}
 	
-	public void beginSearch(String query, ResultListener listener) throws IOException, InterruptedException
+	public void beginSearch(String query, ResultListener listener) throws IOException
 	{		
 		if (peers == null)
 		{
@@ -522,7 +531,9 @@ public class Client {
 				// Start the search thread
 				System.out.println("Spawning thread to search "+peer.getIpAddress());
 				Thread t = new SearchThread(database, peer, listener, query);
-				searchThreads.add(t);
+				synchronized (searchThreads) {
+					searchThreads.add(t);
+				}
 				t.start();
 			}
 		}
@@ -636,7 +647,13 @@ class IndexDownloadThread implements Runnable {
 			in = Client.getInputStreamFromConnection(conn);
 			
 			// Create the required table
-			database.execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY);");
+			database.beginTransaction();
+			try {
+				database.execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY);");
+				database.setTransactionSuccessful();
+			} finally {
+				database.endTransaction();
+			}
 			
 			// Read from the GET response
 			JsonReader reader = new JsonReader(new InputStreamReader(in));
@@ -684,8 +701,14 @@ class IndexDownloadThread implements Runnable {
 						// If file object had data, add it
 						if (vals.size() != 0)
 						{
-							// Insert it into the database
-							database.insertWithOnConflict(Client.getTableNameForPeer(peer), null, vals, SQLiteDatabase.CONFLICT_REPLACE);
+							database.beginTransaction();
+							try {
+								// Insert it into the database
+								database.insertWithOnConflict(Client.getTableNameForPeer(peer), null, vals, SQLiteDatabase.CONFLICT_REPLACE);
+								database.setTransactionSuccessful();
+							} finally {
+								database.endTransaction();
+							}
 						}
 					}
 					
@@ -710,7 +733,6 @@ class IndexDownloadThread implements Runnable {
 			vals.put("IP", peer.getIpAddress());
 			vals.put("IndexHash", ""+peer.getIndexHash());
 			
-			database.beginTransaction();
 			try {
 				oldHash = Client.getOldHashOfPeerIndex(database, peer);
 				if (oldHash == -1)
@@ -718,6 +740,7 @@ class IndexDownloadThread implements Runnable {
 					System.out.println(peer.getIpAddress()+" has never been seen before (new hash: "+peer.getIndexHash()+")");
 
 					// We need to insert this into the list
+					database.beginTransaction();
 					database.insert(Client.PEER_TABLE, null, vals);
 				}
 				else
@@ -725,6 +748,7 @@ class IndexDownloadThread implements Runnable {
 					System.out.println(peer.getIpAddress()+" has a newer index (old hash: "+oldHash+" | new hash: "+peer.getIndexHash()+")");
 
 					// We need to replace this peer's existing values
+					database.beginTransaction();
 					database.replace(Client.PEER_TABLE, null, vals);
 				}
 				
