@@ -17,7 +17,9 @@ import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 
@@ -46,6 +48,7 @@ public class Client {
 	private SQLiteDatabase database;
 	
 	private ArrayList<Thread> searchThreads;
+	private HashMap<PeerSet.Peer, Thread> indexDownloadThreads;
 	
 	private static final String CREATE_PEER_TABLE = "CREATE TABLE peers (IP TEXT PRIMARY KEY, IndexHash INT);";
 
@@ -58,6 +61,7 @@ public class Client {
 	{
 		this.context = context;
 		this.searchThreads = new ArrayList<Thread>();
+		this.indexDownloadThreads = new HashMap<PeerSet.Peer, Thread>();
 		this.peers = new PeerSet();
 	}
 	
@@ -213,7 +217,6 @@ public class Client {
 			peerSet.addPeer(jsonPeer.getString("IP"), jsonPeer.getString("LastSeen"), jsonPeer.getLong("IndexHash"));
 		}
 		
-		
 		return peerSet;
 	}
 	
@@ -342,7 +345,10 @@ public class Client {
 		endSearch();
 		
 		try {
-			// Wait for them to die
+			// Stop bootstrapping
+			stopBootstrap();
+			
+			// Wait for the search threads to die
 			for (Thread t : searchThreads)
 			{
 				t.join();
@@ -362,7 +368,7 @@ public class Client {
 		try {
 			// Try to read the peer set from the database
 			peers.updatePeerSet(getPeerSetFromDatabase(database));
-			success = true;
+			success = peers.getPeerListLength() != 0;
 		} catch (SQLiteException e) {
 			// Failed to read peer set
 			success = false;
@@ -451,10 +457,26 @@ public class Client {
 		return false;
 	}
 	
+	public void stopBootstrap() throws InterruptedException
+	{
+		synchronized (indexDownloadThreads) {
+			// Interrupt threads
+			for (Thread t : indexDownloadThreads.values())
+			{
+				t.interrupt();
+			}
+			
+			// Wait for them to die
+			for (Thread t : indexDownloadThreads.values())
+			{
+				t.join();
+			}
+		}
+	}
+	
 	public void bootstrapFromNetwork(String initialPeer) throws IOException, JSONException, InterruptedException, NoSuchAlgorithmException, URISyntaxException
 	{
 		Iterator<PeerSet.Peer> iterator;
-		ArrayList<Thread> threadList;
 
 		// Download the peer list
 		if (!downloadPeerList(initialPeer))
@@ -462,50 +484,70 @@ public class Client {
 			throw new IllegalStateException("No peers available");
 		}
 		
-		threadList = new ArrayList<Thread>();
-		
-		try {
-			// We have to do this in a synchronized block so our index download threads
-			// can't touch it while we're downloading
-			synchronized (peers) {
-				// Iterate the peer list and download indexes for each
-				iterator = peers.getPeerListIterator();
-				while (iterator.hasNext())
-				{
-					PeerSet.Peer peer = iterator.next();
-					long oldHash;
-					
-					// Check if the old index hash is valid
-					oldHash = getOldHashOfPeerIndex(database, peer);
-					if (oldHash == peer.getIndexHash())
-					{
-						System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
-						
-						// Don't download anything
-						continue;
-					}
-					
-					// We need to download the updated index
-					threadList.add(startDownloadIndexThreadForPeer(database, peer));
-				}
+		// Reap threads that aren't still downloading
+		ArrayList<PeerSet.Peer> reapList = new ArrayList<PeerSet.Peer>();
+		synchronized (indexDownloadThreads) {
+			// Add dead threads to the reap list
+			for (Map.Entry<PeerSet.Peer, Thread> entry : indexDownloadThreads.entrySet())
+			{
+				if (entry.getValue().getState() == Thread.State.TERMINATED)
+					reapList.add(entry.getKey());
 			}
 			
-			System.out.println("Bootstrapped");
-		} finally {
-			// Wait for downloads to finish
-			for (Thread t : threadList)
-				t.join();
+			// Reap dead threads
+			for (PeerSet.Peer p : reapList)
+			{
+				indexDownloadThreads.remove(p);
+			}
 		}
-
+		
+		// We have to do this in a synchronized block so our index download threads
+		// can't touch it while we're downloading
+		synchronized (peers) {
+			// Iterate the peer list and download indexes for each
+			iterator = peers.getPeerListIterator();
+			while (iterator.hasNext())
+			{
+				PeerSet.Peer peer = iterator.next();
+				long oldHash;
+				
+				// Check if the old index hash is valid
+				oldHash = getOldHashOfPeerIndex(database, peer);
+				if (oldHash == peer.getIndexHash())
+				{
+					System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
+					
+					// Don't download anything
+					continue;
+				}
+				
+				// Spawn an updater thread if one doesn't already exist
+				synchronized (indexDownloadThreads) {
+					if (!indexDownloadThreads.containsKey(peer))
+						indexDownloadThreads.put(peer, startDownloadIndexThreadForPeer(database, peer));
+				}
+			}
+		}
 	}
 	
 	public void endSearch()
 	{
+		ArrayList<Thread> reapList = new ArrayList<Thread>();
+
 		synchronized (searchThreads) {	
 			// Interrupt existing search threads
 			for (Thread t : searchThreads)
 			{
-				t.interrupt();
+				if (t.getState() == Thread.State.TERMINATED)
+					reapList.add(t);
+				else
+					t.interrupt();
+			}
+			
+			// Reap dead threads
+			for (Thread t : reapList)
+			{
+				searchThreads.remove(t);
 			}
 		}
 	}
@@ -614,7 +656,7 @@ public class Client {
 	}
 }
 
-class IndexDownloadThread implements Runnable {
+class IndexDownloadThread extends Thread {
 	SQLiteDatabase database;
 	PeerSet.Peer peer;
 	
@@ -657,76 +699,83 @@ class IndexDownloadThread implements Runnable {
 			
 			// Read from the GET response
 			JsonReader reader = new JsonReader(new InputStreamReader(in));
-			
-			// Start reading the index object
-			reader.beginObject();
-			
-			// Read the index object
-			while (reader.hasNext())
-			{
-				String ioname = reader.nextName();
-				if (ioname.equals("List"))
+			try {
+				// Start reading the index object
+				reader.beginObject();
+				
+				// Read the index object
+				while (reader.hasNext())
 				{
-					// Now start reading the array
-					reader.beginArray();
-					
-					while (reader.hasNext())
+					String ioname = reader.nextName();
+					if (ioname.equals("List"))
 					{
-						String file = null;
+						// Now start reading the array
+						reader.beginArray();
 						
-						// Start reading the file object
-						reader.beginObject();
-						ContentValues vals = new ContentValues();
-						
-						// Read the file object
 						while (reader.hasNext())
 						{
-							String foname = reader.nextName();
-							if (foname.equals("FileName"))
+							String file = null;
+							
+							// Start reading the file object
+							reader.beginObject();
+							ContentValues vals = new ContentValues();
+							
+							// Read the file object
+							while (reader.hasNext())
 							{
-								// Read the file name
-								file = reader.nextString();
-								vals.put("FileName", file);
+								String foname = reader.nextName();
+								if (foname.equals("FileName"))
+								{
+									// Read the file name
+									file = reader.nextString();
+									vals.put("FileName", file);
+								}
+								else
+								{
+									// Otherwise just skip it
+									reader.skipValue();
+								}
 							}
-							else
+							
+							// End of file object
+							reader.endObject();
+							
+							// If file object had data, add it
+							if (vals.size() != 0)
 							{
-								// Otherwise just skip it
-								reader.skipValue();
+								database.beginTransaction();
+								try {
+									// Insert it into the database
+									database.insertWithOnConflict(Client.getTableNameForPeer(peer), null, vals, SQLiteDatabase.CONFLICT_REPLACE);
+									database.setTransactionSuccessful();
+								} finally {
+									database.endTransaction();
+								}
+							}
+							
+							// If we've been interrupted, let's die
+							if (isInterrupted())
+							{
+								throw new InterruptedException();
 							}
 						}
 						
-						// End of file object
-						reader.endObject();
-						
-						// If file object had data, add it
-						if (vals.size() != 0)
-						{
-							database.beginTransaction();
-							try {
-								// Insert it into the database
-								database.insertWithOnConflict(Client.getTableNameForPeer(peer), null, vals, SQLiteDatabase.CONFLICT_REPLACE);
-								database.setTransactionSuccessful();
-							} finally {
-								database.endTransaction();
-							}
-						}
+						// Done reading array
+						reader.endArray();
 					}
-					
-					// Done reading array
-					reader.endArray();
+					else
+					{
+						// Skip it
+						reader.skipValue();
+					}
 				}
-				else
-				{
-					// Skip it
-					reader.skipValue();
-				}
-			}
 
-			// End of index object
-			reader.endObject();
-			
-			// Close the GET request input stream
-			in.close();
+				// End of index object
+				reader.endObject();
+			} finally {
+				// Close the JSON reader
+				reader.close();
+			}
 			
 			// Create the values to be stored in the SQL database
 			ContentValues vals = new ContentValues();
@@ -772,7 +821,7 @@ class IndexDownloadThread implements Runnable {
 				if (in != null)
 					in.close();
 			} catch (IOException e) {}
-			
+						
 			if (conn != null)
 				conn.disconnect();
 		}
