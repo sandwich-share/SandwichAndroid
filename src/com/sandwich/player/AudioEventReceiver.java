@@ -8,9 +8,9 @@ import android.view.KeyEvent;
 
 public class AudioEventReceiver extends BroadcastReceiver
 {
-	static private AudioPlayer player;
+	static private AudioPlayerService.AudioBinder player;
 	
-	public AudioEventReceiver(AudioPlayer player)
+	public AudioEventReceiver(AudioPlayerService.AudioBinder player)
 	{
 		// FIXME: Janky
 		AudioEventReceiver.player = player;
@@ -41,8 +41,7 @@ public class AudioEventReceiver extends BroadcastReceiver
             	break;
             	
             case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
-            	// Emulate play/pause click
-                player.onClick(null);
+                player.playpause();
                 break;
 
             default:

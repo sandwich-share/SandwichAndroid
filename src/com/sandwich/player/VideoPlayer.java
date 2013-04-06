@@ -1,5 +1,6 @@
 package com.sandwich.player;
 
+import com.sandwich.Dialog;
 import com.sandwich.R;
 import com.sandwich.SpinnerDialog;
 
@@ -78,8 +79,29 @@ public class VideoPlayer implements SandwichPlayer,OnErrorListener,OnPreparedLis
 			waitDialog = null;
 		}
 		
-		// Close the player
-		activity.finish();
+		String error;
+		
+		// Decode the error
+		switch (extra)
+		{
+		case MediaPlayer.MEDIA_ERROR_IO:
+		case MediaPlayer.MEDIA_ERROR_MALFORMED:
+		case MediaPlayer.MEDIA_ERROR_TIMED_OUT:
+			error = "Connection failed";
+			break;
+
+		case MediaPlayer.MEDIA_ERROR_UNSUPPORTED:
+		case MediaPlayer.MEDIA_ERROR_NOT_VALID_FOR_PROGRESSIVE_PLAYBACK:
+			error = "Media format unsupported";
+			break;
+
+		default:
+			error = "Unknown error";
+			break;
+		}
+		
+		// Display an error dialog
+		Dialog.displayDialog(activity, "Streaming Error", error, true);
 		return true;
 	}
 
