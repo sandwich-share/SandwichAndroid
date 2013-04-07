@@ -41,6 +41,8 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteStatement;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -75,6 +77,14 @@ public class Client {
 			return signed;
 		else
 			return signed+256;
+	}
+	
+	private boolean isNetworkActive()
+	{
+		ConnectivityManager mgr = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+		NetworkInfo active = mgr.getActiveNetworkInfo();
+
+		return (active != null && active.isConnected());
 	}
 	
 	public static int getPortNumberFromIPAddress(InetAddress address) throws NoSuchAlgorithmException
@@ -407,6 +417,10 @@ public class Client {
 				// If we get here, bootstrapping was successful
 				return true;
 			} catch (Exception e) {
+				// Make sure the network is available
+				if (!isNetworkActive())
+					return false;
+				
 				// Failed to connect to this one, so prune it
 				selectedPeer.remove();
 				
