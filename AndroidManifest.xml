@@ -29,6 +29,7 @@
             android:configChanges="orientation|screenSize"
             android:label="@string/title_activity_video_player"
             android:parentActivityName="com.sandwich.SandwichMain"
+            android:launchMode="singleTask"
             android:screenOrientation="landscape" >
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
@@ -39,7 +40,7 @@
             android:configChanges="orientation|screenSize"
             android:label="@string/title_activity_audio_player"
             android:parentActivityName="com.sandwich.SandwichMain" 
-            android:launchMode="singleTop">
+            android:launchMode="singleTask">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.sandwich.Search" />
@@ -47,7 +48,7 @@
         <activity
             android:name="com.sandwich.Search"
             android:label="@string/title_activity_search"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:configChanges="orientation|screenSize" >
             <intent-filter>
             	<action android:name="android.intent.action.SEARCH" />
