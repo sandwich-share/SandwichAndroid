@@ -2,7 +2,7 @@ package com.sandwich.client;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.Inet6Address;
@@ -27,7 +27,9 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.google.gson.stream.JsonReader;
+import com.fasterxml.jackson.core.JsonFactory;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonToken;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
@@ -38,6 +40,7 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
+import android.database.sqlite.SQLiteStatement;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -50,7 +53,7 @@ public class Client {
 	private ArrayList<Thread> searchThreads;
 	private HashMap<PeerSet.Peer, Thread> indexDownloadThreads;
 	
-	private static final String CREATE_PEER_TABLE = "CREATE TABLE peers (IP TEXT PRIMARY KEY, IndexHash INT);";
+	private static final String CREATE_PEER_TABLE = "CREATE TABLE IF NOT EXISTS peers (IP TEXT PRIMARY KEY, IndexHash INT);";
 
 	static final String PEER_TABLE = "peers";
 	static final String PEER_DB = "peers.db";
@@ -164,7 +167,7 @@ public class Client {
 		return new URL(urlString);
 	}
 	
-	static BufferedInputStream getInputStreamFromConnection(HttpURLConnection conn) throws IOException
+	static InputStream getInputStreamFromConnection(HttpURLConnection conn) throws IOException
 	{
 		int responseCode;
 
@@ -174,8 +177,8 @@ public class Client {
 		{
 			throw new ConnectException("Failed to get peer list from bootstrap peer");
 		}
-
-		return new BufferedInputStream(conn.getInputStream());
+		
+		return conn.getInputStream();
 	}
 	
 	private PeerSet getPeerList(URL bootstrapUrl) throws IOException, JSONException
@@ -297,19 +300,6 @@ public class Client {
 	@TargetApi(Build.VERSION_CODES.HONEYCOMB)
 	public void initialize()
 	{
-		boolean databaseCreated;
-		
-		// Check if the database already exists
-		databaseCreated = true;
-		for (String db : context.databaseList())
-		{
-			if (db.equals(PEER_DB))
-			{
-				databaseCreated = false;
-				break;
-			}
-		}
-
 		// Open or create it
 		database = context.openOrCreateDatabase(PEER_DB, Context.MODE_PRIVATE, null);
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
@@ -318,11 +308,13 @@ public class Client {
 			database.enableWriteAheadLogging();
 		}
 		
-		// Create our table if it's a new database
-		if (databaseCreated)
-		{
-			database.execSQL(CREATE_PEER_TABLE);
-		}
+		// Create our table
+		database.execSQL(CREATE_PEER_TABLE);
+		
+		// Setup the database to be fast
+		database.execSQL("PRAGMA synchronous=OFF");
+		database.execSQL("PRAGMA count_changes=OFF");
+		database.execSQL("PRAGMA temp_store=MEMORY");
 	}
 	
 	public void release()
@@ -659,7 +651,7 @@ class IndexDownloadThread extends Thread {
 	public void run() {
 		URL queryUrl;
 		HttpURLConnection conn;
-		BufferedInputStream in;
+		InputStream in;
 		long oldHash;
 		
 		conn = null;
@@ -678,80 +670,59 @@ class IndexDownloadThread extends Thread {
 			in = Client.getInputStreamFromConnection(conn);
 			
 			// Create the required table
-			database.execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY);");
+			database.execSQL("CREATE TABLE IF NOT EXISTS "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY);");
 			
+			// Compile the database insert so we don't have to do it each time
+			SQLiteStatement insertStmt = database.compileStatement("INSERT OR REPLACE INTO "+Client.getTableNameForPeer(peer)+" VALUES (?1);");
+
 			// Read from the GET response
-			JsonReader reader = new JsonReader(new InputStreamReader(in));
+			JsonFactory jfactory = new JsonFactory();
+			JsonParser parser = jfactory.createJsonParser(new BufferedInputStream(in));
+			
+			// Begin immediate transaction
+			database.execSQL("BEGIN IMMEDIATE TRANSACTION");
 			try {
-				// Start reading the index object
-				reader.beginObject();
-				
-				// Read the index object
-				while (reader.hasNext())
+				// Parse the index object
+				parser.nextToken();
+				while (parser.nextToken() != JsonToken.END_OBJECT)
 				{
-					String ioname = reader.nextName();
+					String ioname = parser.getCurrentName();
+					
 					if (ioname.equals("List"))
 					{
-						// Now start reading the array
-						reader.beginArray();
-						
-						while (reader.hasNext())
-						{
-							String file = null;
-							
-							// Start reading the file object
-							reader.beginObject();
-							ContentValues vals = new ContentValues();
-							
-							// Read the file object
-							while (reader.hasNext())
+						parser.nextToken();
+						while (parser.nextToken() != JsonToken.END_ARRAY)
+						{							
+							while (parser.nextToken() != JsonToken.END_OBJECT)
 							{
-								String foname = reader.nextName();
+								String foname = parser.getCurrentName();
+								
 								if (foname.equals("FileName"))
 								{
-									// Read the file name
-									file = reader.nextString();
-									vals.put("FileName", file);
+									parser.nextToken();
+									insertStmt.bindString(1, parser.getText());
+									insertStmt.execute();
 								}
 								else
 								{
-									// Otherwise just skip it
-									reader.skipValue();
+									parser.nextToken();
 								}
 							}
 							
-							// End of file object
-							reader.endObject();
-							
-							// If file object had data, add it
-							if (vals.size() != 0)
-							{
-								// Insert it into the database
-								database.insertWithOnConflict(Client.getTableNameForPeer(peer), null, vals, SQLiteDatabase.CONFLICT_REPLACE);
-							}
-							
-							// If we've been interrupted, let's die
-							if (isInterrupted())
-							{
-								throw new InterruptedException();
-							}
+							if (isInterrupted()) throw new InterruptedException();
 						}
-						
-						// Done reading array
-						reader.endArray();
 					}
 					else
 					{
-						// Skip it
-						reader.skipValue();
+						parser.nextToken();
 					}
 				}
-
-				// End of index object
-				reader.endObject();
 			} finally {
-				// Close the JSON reader
-				reader.close();
+				// Commit transaction
+				database.execSQL("END TRANSACTION");
+				
+				// Close the JSON parser
+				parser.close();
 			}
 			
 			// Create the values to be stored in the SQL database
