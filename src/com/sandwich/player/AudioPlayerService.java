@@ -314,9 +314,14 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
 		onAudioFocusChange(res);
 		
-		// Start a thread to get the metadata
-		metadataThread = new Thread(this);
-		metadataThread.start();
+		// If we're API level 10+, we have a metadata retreiver that we'll spin off to pull down
+		// album art, artist, and song title. It will also update our notification using the pending
+		// intent to include the new metadata.
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.GINGERBREAD_MR1)
+		{
+			metadataThread = new Thread(this);
+			metadataThread.start();
+		}
 	}
 
 	@Override
