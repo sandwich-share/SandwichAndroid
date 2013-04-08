@@ -36,13 +36,16 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
-        public static final int action_settings=0x7f0a0008;
+        public static final int action_settings=0x7f0a000b;
         public static final int albumArt=0x7f0a0004;
+        public static final int download=0x7f0a0008;
         public static final int playButton=0x7f0a0001;
         public static final int resultsListView=0x7f0a0005;
         public static final int rowTextView=0x7f0a0007;
         public static final int seekBar=0x7f0a0000;
+        public static final int share=0x7f0a000a;
         public static final int songText=0x7f0a0003;
+        public static final int stream=0x7f0a0009;
         public static final int timeView=0x7f0a0002;
         public static final int videoView=0x7f0a0006;
     }
@@ -54,13 +57,17 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
     }
     public static final class menu {
         public static final int audio_player=0x7f090000;
-        public static final int media_player=0x7f090001;
-        public static final int search=0x7f090002;
+        public static final int context_menu=0x7f090001;
+        public static final int media_player=0x7f090002;
+        public static final int search=0x7f090003;
     }
     public static final class string {
         public static final int action_settings=0x7f070005;
         public static final int app_name=0x7f070000;
+        public static final int download=0x7f070006;
         public static final int search_hint=0x7f070001;
+        public static final int share=0x7f070008;
+        public static final int stream=0x7f070007;
         public static final int title_activity_audio_player=0x7f070003;
         public static final int title_activity_search=0x7f070004;
         public static final int title_activity_video_player=0x7f070002;

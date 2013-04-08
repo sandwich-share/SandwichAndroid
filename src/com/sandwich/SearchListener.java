@@ -9,18 +9,16 @@ import android.app.Activity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
-import android.widget.AdapterView.OnItemLongClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
-import android.widget.TextView;
 
-public class SearchListener implements ResultListener,OnItemClickListener,Runnable,OnItemLongClickListener  {
+public class SearchListener implements ResultListener,OnItemClickListener,Runnable  {
 	private Client sandwichClient;
 	private Activity activity;
 	
 	private ListView resultsView;
 	
-	private ArrayList<String> results;
+	private ArrayList<ResultListener.Result> results;
 		
 	public SearchListener(Activity activity, Client client)
 	{
@@ -31,17 +29,17 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		this.resultsView = (ListView)activity.findViewById(R.id.resultsListView);
 		
 		// Initialize the results list
-		results = new ArrayList<String>();
+		results = new ArrayList<ResultListener.Result>();
 	}
 	
 	@SuppressWarnings("unchecked")
 	// Called when the search button is clicked
 	public boolean onQueryTextSubmit(String query)
 	{
-		ArrayAdapter<String> listAdapter;
+		ArrayAdapter<ResultListener.Result> listAdapter;
 		
 		// Clear the results list
-		listAdapter = (ArrayAdapter<String>)resultsView.getAdapter();
+		listAdapter = (ArrayAdapter<ResultListener.Result>)resultsView.getAdapter();
 		listAdapter.clear();
 		
 		// Initialize the results list
@@ -61,52 +59,21 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 
 	@Override
 	// Called for each result found during the search
-	public void foundResult(String query, String peer, String result) {
+	public void foundResult(String query, ResultListener.Result result) {
 		synchronized (results) {
-			results.add(peer+" - "+result);
+			results.add(result);
 		}
 		
 		activity.runOnUiThread(this);
 	}
-
-	@Override
-	// Called when an item within the list view is clicked
-	public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
-		TextView row = (TextView) view;
-		String resultTuple[] = row.getText().toString().split(" - ");
-		String filePath;
-		
-		// Only the first split is ours, any other belongs in the path
-		filePath = "";
-		for (int i = 1; i < resultTuple.length; i++)
-		{
-			if (i > 1)
-				filePath += " - ";
-			
-			filePath += resultTuple[i];
-		}
-		
-		// Result tuple is in the format: peer - file
-		try {
-			sandwichClient.startFileDownloadFromPeer(resultTuple[0], filePath);
-		} catch (Exception e) {
-			Dialog.displayDialog(activity, "Download Error", e.getMessage(), false);
-			return true;
-		}
-		
-		// Already handled
-		return true;
-	}
-
 	
 	@Override
 	// Called in UI thread to add search result
 	public void run() {
 		@SuppressWarnings("unchecked")
-		ArrayAdapter<String> listAdapter = (ArrayAdapter<String>)resultsView.getAdapter();
-		
+		ArrayAdapter<ResultListener.Result> listAdapter = (ArrayAdapter<ResultListener.Result>)resultsView.getAdapter();
 		synchronized (results) {
-			for (String result : results)
+			for (ResultListener.Result result : results)
 			{
 				listAdapter.add(result);
 			}
@@ -115,7 +82,6 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 			results.clear();
 		}
 	}
-
 	
 	@Override
 	public void searchFailed(String query, String peer, Exception e) {
@@ -124,26 +90,6 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 
 	@Override
 	public void onItemClick(AdapterView<?> adapterView, View view, int position, long id) {
-		TextView row = (TextView) view;
-		String resultTuple[] = row.getText().toString().split(" - ");
-		String filePath;
-		
-		// Only the first split is ours, any other belongs in the path
-		filePath = "";
-		for (int i = 1; i < resultTuple.length; i++)
-		{
-			if (i > 1)
-				filePath += " - ";
-			
-			filePath += resultTuple[i];
-		}
-		
-		// Result tuple is in the format: peer - file
-		try {
-			sandwichClient.startFileStreamFromPeer(activity, resultTuple[0], filePath);
-		} catch (Exception e) {
-			e.printStackTrace();
-			Dialog.displayDialog(activity, "Streaming Error", e.getMessage(), false);
-		}
+		activity.openContextMenu(view);
 	}
 }

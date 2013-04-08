@@ -7,5 +7,9 @@
     <string name="title_activity_audio_player">Sandwich Audio Player</string>
     <string name="title_activity_search">Sandwich</string>
     <string name="action_settings">Settings</string>
+    
+    <string name="download">Download File</string>
+    <string name="stream">Stream Media</string>
+    <string name="share">Share URL</string>
 
 </resources>

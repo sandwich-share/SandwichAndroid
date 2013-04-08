@@ -1,19 +1,26 @@
 package com.sandwich;
 
 
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.net.URISyntaxException;
+import java.net.UnknownHostException;
+import java.security.NoSuchAlgorithmException;
+
 import android.app.Activity;
+import android.content.Intent;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
 import com.sandwich.client.Client;
+import com.sandwich.client.ResultListener;
 
-public class BootstrapThread implements Runnable {
+public class ClientThread implements Runnable {
 	private Activity activity;
 	private Client client;
-	private boolean bootstrapped;
 	private SearchListener listener;
 	
-	public BootstrapThread(Activity activity)
+	public ClientThread(Activity activity)
 	{
 		this.activity = activity;
 		this.client = null;
@@ -23,6 +30,33 @@ public class BootstrapThread implements Runnable {
 	{
 		// A bit of a hack
 		listener.onQueryTextSubmit(query);
+	}
+	
+	public boolean isResultStreamable(ResultListener.Result result)
+	{
+		return client.isResultStreamable(result);
+	}
+	
+	public void download(ResultListener.Result result) throws NoSuchAlgorithmException, MalformedURLException, URISyntaxException, IOException
+	{
+		client.startFileDownloadFromPeer(result.peer, result.result);
+	}
+	
+	public void stream(ResultListener.Result result) throws NoSuchAlgorithmException, MalformedURLException, URISyntaxException, IOException
+	{
+		client.startFileStreamFromPeer(activity, result.peer, result.result);
+	}
+	
+	public void share(ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
+	{
+		Intent shareIntent = new Intent();
+		String url = client.getUriForResult(result);
+		
+		shareIntent.setAction(Intent.ACTION_SEND);
+		shareIntent.putExtra(Intent.EXTRA_TEXT, url);
+		shareIntent.setType("text/plain");
+
+		activity.startActivity(Intent.createChooser(shareIntent, "Share to..."));
 	}
 	
 	public void initialize()
@@ -41,10 +75,9 @@ public class BootstrapThread implements Runnable {
         ListView results = (ListView)activity.findViewById(R.id.resultsListView);
         results.setAdapter(new ArrayAdapter<String>(activity, R.layout.simplerow));
         results.setOnItemClickListener(listener);
-        results.setOnItemLongClickListener(listener);
         
         // Bootstrap from the cache initially
-        bootstrapped = client.bootstrapFromCache();
+        client.bootstrapFromCache();
 	}
 	
 	public void release()
@@ -57,33 +90,15 @@ public class BootstrapThread implements Runnable {
 	
 	@Override
 	public void run() {
-		SpinnerDialog d;
-
 		if (client == null)
 			throw new IllegalStateException("Bootstrap thread was not initialized");
-		
-		// If we're not running on cache, we want to display the spinner and block the user, otherwise we just bootstrap in the background
-		if (!bootstrapped)
-		{
-			d = SpinnerDialog.displayDialog(activity, "Please Wait", "Waiting for initial bootstrap", false);
-		}
-		else
-		{
-			d = null;
-		}
 
 		try {
 			String initialHost = "isys-ubuntu.case.edu";
 
 			// Bootstrap from network
 			client.bootstrapFromNetwork(initialHost);
-			
-			// Bootstrapped
-			bootstrapped = true;
-			
-			if (d != null) d.dismiss();
 		} catch (Exception e) {
-			if (d != null) d.dismiss();
 			Dialog.displayDialog(activity, "Bootstrap Error", e.getMessage(), true);
 			e.printStackTrace();
 		}

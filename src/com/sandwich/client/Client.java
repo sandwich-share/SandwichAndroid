@@ -484,6 +484,38 @@ public class Client {
 		}
 	}
 	
+	public String getUriForResult(ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
+	{
+		return createPeerUrlString(result.peer, "/file", "path="+result.result);
+	}
+	
+	public boolean isResultStreamable(ResultListener.Result result)
+	{
+		String mimeType;
+
+		mimeType = URLConnection.guessContentTypeFromName(result.result);
+		if (mimeType == null)
+		{
+			// Undetermined MIME type
+			return false;
+		}
+		else if (mimeType.startsWith("audio/"))
+		{
+			// Streamable via the audio player
+			return true;
+		}
+		else if (mimeType.startsWith("video/"))
+		{
+			// Streamable via the video player
+			return true;
+		}
+		else
+		{
+			// No player for this
+			return false;
+		}
+	}
+	
 	public void bootstrapFromNetwork(String initialPeer) throws IOException, JSONException, InterruptedException, NoSuchAlgorithmException, URISyntaxException
 	{
 		Iterator<PeerSet.Peer> iterator;
@@ -815,7 +847,7 @@ class SearchThread extends Thread {
 			{
 				String file = c.getString(0);
 				if (!isInterrupted())
-					listener.foundResult(query, peer.getIpAddress(), file);
+					listener.foundResult(query, new ResultListener.Result(peer.getIpAddress(), file));
 				else
 				{
 					System.out.println("Search on "+peer.getIpAddress()+" was interrupted");
