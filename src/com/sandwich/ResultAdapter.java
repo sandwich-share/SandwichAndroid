@@ -13,9 +13,9 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.TextView;
 
-public class ResultAdapter<T extends ResultListener.Result> extends BaseAdapter {
-	private SparseArray<T> adapterTable;
-	private HashMap<T, Integer> mirror;
+public class ResultAdapter extends BaseAdapter {
+	private SparseArray<ResultListener.Result> adapterTable;
+	private HashMap<ResultListener.Result, Integer> mirror;
 	private Context context;
 	private int rowResourceId;
 	
@@ -23,29 +23,29 @@ public class ResultAdapter<T extends ResultListener.Result> extends BaseAdapter 
 	{
 		this.context = context;
 		this.rowResourceId = rowResourceId;
-		this.adapterTable = new SparseArray<T>();
-		this.mirror = new HashMap<T, Integer>();
+		this.adapterTable = new SparseArray<ResultListener.Result>();
+		this.mirror = new HashMap<ResultListener.Result, Integer>();
 	}
 	
-	public boolean add(T t) {
-		if (mirror.containsKey(t))
+	public boolean add(ResultListener.Result result) {
+		if (mirror.containsKey(result))
 		{
-			T existingT = adapterTable.get(mirror.get(t));
-			existingT.addPeers(t.peers);
+			ResultListener.Result existingResult = adapterTable.get(mirror.get(result));
+			existingResult.addPeers(result.peers);
 		}
 		else
 		{
-			adapterTable.put(adapterTable.size(), t);
-			mirror.put(t, mirror.size());
+			adapterTable.put(adapterTable.size(), result);
+			mirror.put(result, mirror.size());
 		}
 		return true;
 	}
 	
-	public T remove(int id) {
-		T t = adapterTable.get(id);
+	public ResultListener.Result remove(int id) {
+		ResultListener.Result result = adapterTable.get(id);
 		adapterTable.remove(id);
-		mirror.remove(t);
-		return t;
+		mirror.remove(result);
+		return result;
 	}
 	
 	public void clear() {
@@ -53,7 +53,7 @@ public class ResultAdapter<T extends ResultListener.Result> extends BaseAdapter 
 		mirror.clear();
 	}
 	
-	public T get(int id) {
+	public ResultListener.Result get(int id) {
 		return adapterTable.get(id);
 	}
 	
@@ -87,5 +87,4 @@ public class ResultAdapter<T extends ResultListener.Result> extends BaseAdapter 
 		
         return row;
 	}
-	
 }

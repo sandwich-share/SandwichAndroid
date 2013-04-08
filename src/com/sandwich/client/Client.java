@@ -604,9 +604,6 @@ public class Client {
 			throw new IllegalStateException("Not bootstrapped");
 		}
 		
-		// End an existing search
-		endSearch();
-		
 		// Make sure the peer list isn't modified by the search threads while we're iterating
 		synchronized (peers) {
 			// Start search threads for each peer

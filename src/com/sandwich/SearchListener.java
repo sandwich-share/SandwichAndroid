@@ -31,14 +31,17 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		results = new ArrayList<ResultListener.Result>();
 	}
 	
-	@SuppressWarnings("unchecked")
 	// Called when the search button is clicked
 	public boolean onQueryTextSubmit(String query)
 	{
-		ResultAdapter<ResultListener.Result> listAdapter;
+		ResultAdapter listAdapter;
+		
+		// End any pending search to prevent modification of these result lists
+		// after we've cleared them, but before beginSearch() kills them.
+		sandwichClient.endSearch();
 		
 		// Clear the results list
-		listAdapter = (ResultAdapter<ResultListener.Result>)resultsView.getAdapter();
+		listAdapter = (ResultAdapter)resultsView.getAdapter();
 		listAdapter.clear();
 		
 		// Initialize the results list
@@ -69,8 +72,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	@Override
 	// Called in UI thread to add search result
 	public void run() {
-		@SuppressWarnings("unchecked")
-		ResultAdapter<ResultListener.Result> listAdapter = (ResultAdapter<ResultListener.Result>)resultsView.getAdapter();
+		ResultAdapter listAdapter = (ResultAdapter)resultsView.getAdapter();
 		synchronized (results) {
 			for (ResultListener.Result result : results)
 			{

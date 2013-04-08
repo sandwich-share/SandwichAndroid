@@ -124,7 +124,7 @@ public class ClientThread implements Runnable {
         
         // Add our array adapter to the list view
         ListView results = (ListView)activity.findViewById(R.id.resultsListView);
-        results.setAdapter(new ResultAdapter<ResultListener.Result>(activity, R.layout.simplerow));
+        results.setAdapter(new ResultAdapter(activity, R.layout.simplerow));
         results.setOnItemClickListener(listener);
         
         // Bootstrap from the cache initially
