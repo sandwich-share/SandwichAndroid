@@ -57,7 +57,7 @@ public class Client {
 	SQLiteDatabase database;
 	private HashMap<PeerSet.Peer, SQLiteDatabase> peerDatabases;
 	
-	private static final String CREATE_PEER_TABLE = "CREATE TABLE IF NOT EXISTS peers (IP TEXT PRIMARY KEY, IndexHash INT);";
+	private static final String CREATE_PEER_TABLE = "CREATE TABLE IF NOT EXISTS peers (IP TEXT PRIMARY KEY, IndexHash INT, LastSeen TEXT);";
 
 	static final String PEER_TABLE = "peers";
 	static final String PEER_DB = "peers.db";
@@ -715,9 +715,15 @@ class IndexDownloadThread extends Thread {
 		URL queryUrl;
 		HttpURLConnection conn;
 		InputStream in;
+		long indexHash;
+		String timeStamp;
+		boolean gotIndexHash;
 		
 		conn = null;
 		in = null;
+		timeStamp = null;
+		indexHash = 0;
+		gotIndexHash = false;
 		
 		// Drop the tables and rows for this peer
 		client.deletePeerFromDatabase(peer);
@@ -732,10 +738,10 @@ class IndexDownloadThread extends Thread {
 			in = Client.getInputStreamFromConnection(conn);
 			
 			// Create the required table
-			peerindex.execSQL("CREATE TABLE IF NOT EXISTS "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY);");
+			peerindex.execSQL("CREATE TABLE IF NOT EXISTS "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY, Size INTEGER, Checksum INTEGER);");
 			
 			// Compile the database insert so we don't have to do it each time
-			SQLiteStatement insertStmt = peerindex.compileStatement("INSERT OR REPLACE INTO "+Client.getTableNameForPeer(peer)+" VALUES (?1);");
+			SQLiteStatement insertStmt = peerindex.compileStatement("INSERT OR REPLACE INTO "+Client.getTableNameForPeer(peer)+" VALUES (?1, ?2, ?3);");
 
 			// Read from the GET response
 			JsonFactory jfactory = new JsonFactory();
@@ -750,7 +756,18 @@ class IndexDownloadThread extends Thread {
 				{
 					String ioname = parser.getCurrentName();
 					
-					if (ioname.equals("List"))
+					if (ioname.equals("IndexHash"))
+					{
+						parser.nextToken();
+						indexHash = parser.getLongValue();
+						gotIndexHash = true;
+					}
+					else if (ioname.equals("TimeStamp"))
+					{
+						parser.nextToken();
+						timeStamp = parser.getText();
+					}
+					else if (ioname.equals("List"))
 					{
 						parser.nextToken();
 						while (parser.nextToken() != JsonToken.END_ARRAY)
@@ -763,12 +780,24 @@ class IndexDownloadThread extends Thread {
 								{
 									parser.nextToken();
 									insertStmt.bindString(1, parser.getText());
-									insertStmt.execute();
+								}
+								else if (foname.equals("CheckSum"))
+								{
+									parser.nextToken();
+									insertStmt.bindLong(3, parser.getLongValue());
+								}
+								else if (foname.equals("Size"))
+								{
+									parser.nextToken();
+									insertStmt.bindLong(2, parser.getLongValue());
 								}
 								else
 								{
 									parser.nextToken();
 								}
+								
+								insertStmt.execute();
+								insertStmt.clearBindings();
 							}
 							
 							if (isInterrupted()) throw new InterruptedException();
@@ -783,14 +812,22 @@ class IndexDownloadThread extends Thread {
 				// Commit transaction
 				peerindex.execSQL("END TRANSACTION");
 				
+				// Delete the precompiled statement
+				insertStmt.close();
+				
 				// Close the JSON parser
 				parser.close();
 			}
 			
+			// Check if we got the header properly
+			if (timeStamp == null || !gotIndexHash)
+				throw new IllegalStateException("No header found in JSON file index");
+			
 			// Create the values to be stored in the SQL database
 			ContentValues vals = new ContentValues();
 			vals.put("IP", peer.getIpAddress());
-			vals.put("IndexHash", ""+peer.getIndexHash());
+			vals.put("IndexHash", indexHash);
+			vals.put("LastSeen", timeStamp);
 
 			// We need to insert this into the list
 			client.database.insert(Client.PEER_TABLE, null, vals);
@@ -836,15 +873,16 @@ class SearchThread extends Thread {
 	@Override
 	public void run() {
 		try {
-			Cursor c = peerindex.query(Client.getTableNameForPeer(peer), new String[] {"FileName"}, "FileName LIKE '%"+query+"%'" , null, null, null, null, null);
+			Cursor c = peerindex.query(Client.getTableNameForPeer(peer), new String[] {"FileName", "CheckSum"}, "FileName LIKE '%"+query+"%'" , null, null, null, null, null);
 			
 			// Iterate the cursor
 			c.moveToFirst();
 			while (!c.isAfterLast())
 			{
 				String file = c.getString(0);
+				int checksum = c.getInt(1);
 				if (!isInterrupted())
-					listener.foundResult(query, new ResultListener.Result(peer.getIpAddress(), file));
+					listener.foundResult(query, new ResultListener.Result(peer.getIpAddress(), file, checksum));
 				else
 				{
 					System.out.println("Search on "+peer.getIpAddress()+" was interrupted");

@@ -12,11 +12,13 @@ public interface ResultListener {
 	public class Result {
 		public String result;
 		public List<String> peers;
+		public int checksum;
 		
-		public Result(String peer, String result)
+		public Result(String peer, String result, int checksum)
 		{
 			this.peers = new ArrayList<String>();
 			this.result = result;
+			this.checksum = checksum;
 			
 			// We have just one peer now
 			peers.add(peer);
@@ -51,8 +53,26 @@ public interface ResultListener {
 		@Override
 		public boolean equals(Object o)
 		{
-			// Checks only for result equality. The peer doesn't matter for us.
-			return ((o instanceof Result) && ((Result)o).result.equals(result));
+			if (o instanceof Result)
+			{
+				Result other = (Result)o;
+				
+				// Check the checksum first because it's less expensive
+				if (other.checksum != checksum)
+					return false;
+				
+				// Check the file name first
+				if (!other.result.equalsIgnoreCase(result))
+					return false;
+				
+				// It's the same result
+				return true;
+			}
+			else
+			{
+				// This isn't even a result...
+				return false;
+			}
 		}
 	}
 }

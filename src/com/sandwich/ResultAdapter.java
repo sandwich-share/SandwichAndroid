@@ -82,7 +82,7 @@ public class ResultAdapter extends BaseAdapter {
 	public View getView(int id, View convertView, ViewGroup parent) {
 		View row = convertView;
         
-        if(row == null)
+        if (row == null)
         {
             LayoutInflater inflater = ((Activity)context).getLayoutInflater();
             row = inflater.inflate(rowResourceId, parent, false);
