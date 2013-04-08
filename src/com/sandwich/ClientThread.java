@@ -9,7 +9,6 @@ import java.security.NoSuchAlgorithmException;
 
 import android.app.Activity;
 import android.content.Intent;
-import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
 import com.sandwich.client.Client;
@@ -73,7 +72,7 @@ public class ClientThread implements Runnable {
         
         // Add our array adapter to the list view
         ListView results = (ListView)activity.findViewById(R.id.resultsListView);
-        results.setAdapter(new ArrayAdapter<String>(activity, R.layout.simplerow));
+        results.setAdapter(new ResultAdapter<ResultListener.Result>(activity, R.layout.simplerow));
         results.setOnItemClickListener(listener);
         
         // Bootstrap from the cache initially

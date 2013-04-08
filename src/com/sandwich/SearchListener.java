@@ -9,7 +9,6 @@ import android.app.Activity;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
-import android.widget.ArrayAdapter;
 import android.widget.ListView;
 
 public class SearchListener implements ResultListener,OnItemClickListener,Runnable  {
@@ -36,10 +35,10 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	// Called when the search button is clicked
 	public boolean onQueryTextSubmit(String query)
 	{
-		ArrayAdapter<ResultListener.Result> listAdapter;
+		ResultAdapter<ResultListener.Result> listAdapter;
 		
 		// Clear the results list
-		listAdapter = (ArrayAdapter<ResultListener.Result>)resultsView.getAdapter();
+		listAdapter = (ResultAdapter<ResultListener.Result>)resultsView.getAdapter();
 		listAdapter.clear();
 		
 		// Initialize the results list
@@ -71,7 +70,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	// Called in UI thread to add search result
 	public void run() {
 		@SuppressWarnings("unchecked")
-		ArrayAdapter<ResultListener.Result> listAdapter = (ArrayAdapter<ResultListener.Result>)resultsView.getAdapter();
+		ResultAdapter<ResultListener.Result> listAdapter = (ResultAdapter<ResultListener.Result>)resultsView.getAdapter();
 		synchronized (results) {
 			for (ResultListener.Result result : results)
 			{

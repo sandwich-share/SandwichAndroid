@@ -19,5 +19,18 @@ public interface ResultListener {
 		{
 			return result;
 		}
+		
+		@Override
+		public int hashCode()
+		{
+			return result.hashCode();
+		}
+		
+		@Override
+		public boolean equals(Object o)
+		{
+			// Checks only for result equality. The peer doesn't matter for us.
+			return ((o instanceof Result) && ((Result)o).result.equals(result));
+		}
 	}
 }
