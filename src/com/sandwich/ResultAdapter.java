@@ -1,6 +1,8 @@
 package com.sandwich;
 
-import java.util.HashSet;
+import java.util.HashMap;
+
+import com.sandwich.client.ResultListener;
 
 import android.app.Activity;
 import android.content.Context;
@@ -11,9 +13,9 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.TextView;
 
-public class ResultAdapter<T> extends BaseAdapter {
+public class ResultAdapter<T extends ResultListener.Result> extends BaseAdapter {
 	private SparseArray<T> adapterTable;
-	private HashSet<T> mirror;
+	private HashMap<T, Integer> mirror;
 	private Context context;
 	private int rowResourceId;
 	
@@ -22,16 +24,20 @@ public class ResultAdapter<T> extends BaseAdapter {
 		this.context = context;
 		this.rowResourceId = rowResourceId;
 		this.adapterTable = new SparseArray<T>();
-		this.mirror = new HashSet<T>();
+		this.mirror = new HashMap<T, Integer>();
 	}
 	
 	public boolean add(T t) {
-		if (mirror.contains(t))
-			return false;
-		
-		adapterTable.put(adapterTable.size(), t);
-		mirror.add(t);
-		
+		if (mirror.containsKey(t))
+		{
+			T existingT = adapterTable.get(mirror.get(t));
+			existingT.addPeers(t.peers);
+		}
+		else
+		{
+			adapterTable.put(adapterTable.size(), t);
+			mirror.put(t, mirror.size());
+		}
 		return true;
 	}
 	

@@ -2,10 +2,10 @@ package com.sandwich;
 
 
 import java.io.IOException;
-import java.net.MalformedURLException;
 import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
+import java.util.Iterator;
 
 import android.app.Activity;
 import android.content.Intent;
@@ -36,20 +36,72 @@ public class ClientThread implements Runnable {
 		return client.isResultStreamable(result);
 	}
 	
-	public void download(ResultListener.Result result) throws NoSuchAlgorithmException, MalformedURLException, URISyntaxException, IOException
+	public void download(ResultListener.Result result) throws NoSuchAlgorithmException, URISyntaxException, IOException
 	{
-		client.startFileDownloadFromPeer(result.peer, result.result);
+		Iterator<String> peers = result.getPeerIterator();
+		
+		while (peers.hasNext())
+		{
+			try {
+				client.startFileDownloadFromPeer(peers.next(), result.result);
+				break;
+			} catch (NoSuchAlgorithmException e) {
+				if (!peers.hasNext())
+					throw e;
+			} catch (URISyntaxException e) {
+				if (!peers.hasNext())
+					throw e;
+			} catch (IOException e) {
+				if (!peers.hasNext())
+					throw e;
+			}
+		}
 	}
 	
-	public void stream(ResultListener.Result result) throws NoSuchAlgorithmException, MalformedURLException, URISyntaxException, IOException
+	public void stream(ResultListener.Result result) throws NoSuchAlgorithmException, URISyntaxException, IOException
 	{
-		client.startFileStreamFromPeer(activity, result.peer, result.result);
+		Iterator<String> peers = result.getPeerIterator();
+		
+		while (peers.hasNext())
+		{
+			try {
+				client.startFileStreamFromPeer(activity, peers.next(), result.result);
+				break;
+			} catch (NoSuchAlgorithmException e) {
+				if (!peers.hasNext())
+					throw e;
+			} catch (URISyntaxException e) {
+				if (!peers.hasNext())
+					throw e;
+			} catch (IOException e) {
+				if (!peers.hasNext())
+					throw e;
+			}
+		}
 	}
 	
 	public void share(ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
 	{
 		Intent shareIntent = new Intent();
-		String url = client.getUriForResult(result);
+		String url = null;
+		Iterator<String> peers = result.getPeerIterator();
+		
+		while (peers.hasNext())
+		{
+			try {
+				 url = client.getUriForResult(peers.next(), result);
+				 break;
+			} catch (NoSuchAlgorithmException e) {
+				if (!peers.hasNext())
+					throw e;
+			} catch (URISyntaxException e) {
+				if (!peers.hasNext())
+					throw e;
+			} catch (UnknownHostException e) {
+				if (!peers.hasNext())
+					throw e;
+			}
+		}
 		
 		shareIntent.setAction(Intent.ACTION_SEND);
 		shareIntent.putExtra(Intent.EXTRA_TEXT, url);

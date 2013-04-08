@@ -1,18 +1,40 @@
 package com.sandwich.client;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+
 public interface ResultListener {
 	public void foundResult(String query, Result result);
 	
 	public void searchFailed(String query, String peer, Exception e);
 	
 	public class Result {
-		public String peer;
 		public String result;
+		public List<String> peers;
 		
 		public Result(String peer, String result)
 		{
-			this.peer = peer;
+			this.peers = new ArrayList<String>();
 			this.result = result;
+			
+			// We have just one peer now
+			peers.add(peer);
+		}
+		
+		public void addPeer(String peer)
+		{
+			peers.add(peer);
+		}
+		
+		public void addPeers(List<String> peers)
+		{
+			this.peers.addAll(peers);
+		}
+		
+		public Iterator<String> getPeerIterator()
+		{
+			return peers.iterator();
 		}
 		
 		public String toString()

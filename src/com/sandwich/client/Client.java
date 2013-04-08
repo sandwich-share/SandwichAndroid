@@ -484,9 +484,9 @@ public class Client {
 		}
 	}
 	
-	public String getUriForResult(ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
+	public String getUriForResult(String peer, ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
 	{
-		return createPeerUrlString(result.peer, "/file", "path="+result.result);
+		return createPeerUrlString(peer, "/file", "path="+result.result);
 	}
 	
 	public boolean isResultStreamable(ResultListener.Result result)
@@ -665,7 +665,7 @@ public class Client {
 		downloader.enqueue(request);
 	}
 	
-	public boolean startFileStreamFromPeer(Activity activity, String peer, String file) throws NoSuchAlgorithmException, URISyntaxException, MalformedURLException, IOException
+	public boolean startFileStreamFromPeer(Activity activity, String peer, String file) throws NoSuchAlgorithmException, URISyntaxException, IOException
 	{
 		String url;
 		String mimeType;
