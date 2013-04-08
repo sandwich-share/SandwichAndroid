@@ -12,7 +12,6 @@ import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLConnection;
 import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -30,6 +29,7 @@ import org.json.JSONObject;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.sandwich.player.MediaMimeInfo;
 
 import android.annotation.TargetApi;
 import android.app.Activity;
@@ -493,7 +493,7 @@ public class Client {
 	{
 		String mimeType;
 
-		mimeType = URLConnection.guessContentTypeFromName(result.result);
+		mimeType = MediaMimeInfo.getMimeTypeForPath(result.result);
 		if (mimeType == null)
 		{
 			// Undetermined MIME type
@@ -667,7 +667,7 @@ public class Client {
 		String url;
 		String mimeType;
 
-		mimeType = URLConnection.guessContentTypeFromName(file);
+		mimeType = MediaMimeInfo.getMimeTypeForPath(file);
 		url = createPeerUrlString(peer, "/file", "path="+file);
 		if (mimeType == null)
 		{

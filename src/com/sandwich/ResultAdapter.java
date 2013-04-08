@@ -37,20 +37,26 @@ public class ResultAdapter extends BaseAdapter {
 		{
 			adapterTable.put(adapterTable.size(), result);
 			mirror.put(result, mirror.size());
+			notifyDataSetChanged();
 		}
 		return true;
 	}
 	
 	public ResultListener.Result remove(int id) {
 		ResultListener.Result result = adapterTable.get(id);
-		adapterTable.remove(id);
-		mirror.remove(result);
+		if (result != null)
+		{
+			adapterTable.remove(id);
+			mirror.remove(result);
+			notifyDataSetChanged();
+		}
 		return result;
 	}
 	
 	public void clear() {
 		adapterTable.clear();
 		mirror.clear();
+		notifyDataSetChanged();
 	}
 	
 	public ResultListener.Result get(int id) {
