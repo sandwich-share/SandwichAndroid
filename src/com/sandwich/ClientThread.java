@@ -8,12 +8,15 @@ import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
+import android.text.ClipboardManager;
 import android.widget.ListView;
 
 import com.sandwich.client.Client;
 import com.sandwich.client.ResultListener;
 
+@SuppressWarnings("deprecation") // Needed to avoid stupid warnings for older ClipboardManager class
 public class ClientThread implements Runnable {
 	private Activity activity;
 	private Client client;
@@ -34,6 +37,35 @@ public class ClientThread implements Runnable {
 	public boolean isResultStreamable(ResultListener.Result result)
 	{
 		return client.isResultStreamable(result);
+	}
+	
+	public void copyUrl(ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
+	{
+		String url = null;
+		Iterator<String> peers = result.getPeerIterator();
+		
+		// This class was deprecated in API level 11, but we need compatibility for API level 9
+		ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+		
+		while (peers.hasNext())
+		{
+			try {
+				 url = client.getUriForResult(peers.next(), result);
+				 break;
+			} catch (NoSuchAlgorithmException e) {
+				if (!peers.hasNext())
+					throw e;
+			} catch (URISyntaxException e) {
+				if (!peers.hasNext())
+					throw e;
+			} catch (UnknownHostException e) {
+				if (!peers.hasNext())
+					throw e;
+			}
+		}
+		
+		// Write to the clipboard
+		clipboard.setText(url);
 	}
 	
 	public void download(ResultListener.Result result) throws NoSuchAlgorithmException, URISyntaxException, IOException

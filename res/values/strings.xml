@@ -11,5 +11,6 @@
     <string name="download">Download File</string>
     <string name="stream">Stream Media</string>
     <string name="share">Share URL</string>
+    <string name="copy">Copy URL</string>
 
 </resources>

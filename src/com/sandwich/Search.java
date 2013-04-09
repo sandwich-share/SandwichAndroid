@@ -104,6 +104,13 @@ public class Search extends Activity {
         		Dialog.displayDialog(this, "Download Error", e.getMessage(), false);
         	}
         	return true;
+        case R.id.copy:
+        	try {
+        		client.copyUrl(result);
+        	} catch (Exception e) {
+        		Dialog.displayDialog(this, "URL Error", e.getMessage(), false);
+        	}
+        	return true;
         case R.id.share:
         	try {
         		client.share(result);
