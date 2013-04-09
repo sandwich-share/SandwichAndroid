@@ -1,14 +1,14 @@
 package com.sandwich.client;
 
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.Iterator;
 
 public class PeerSet {
-	private HashSet<Peer> peerSet;
+	private HashMap<Peer, Peer> peerSet;
 	
 	public PeerSet()
 	{
-		peerSet = new HashSet<Peer>();
+		peerSet = new HashMap<Peer, Peer>();
 	}
 	
 	public synchronized void updatePeerSet(PeerSet peers)
@@ -17,31 +17,37 @@ public class PeerSet {
 		peerSet.clear();
 		
 		// Add a copy of each peer into our peer set
-		for (Peer p : peers.peerSet)
+		for (Peer p : peers.peerSet.values())
 		{
-			addPeer(new Peer(p));
+			updatePeer(new Peer(p));
 		}
 	}
 	
-	public synchronized boolean addPeer(Peer p)
+	public synchronized void updatePeer(Peer p)
 	{
-		if (peerSet.add(p))
+		Peer oldPeer = peerSet.get(p);
+		if (oldPeer != null)
 		{
+			// Update an existing peer
+			oldPeer.indexHash = p.indexHash;
+			oldPeer.timestamp = p.timestamp;
+		}
+		else
+		{
+			// Otherwise add a new one
+			peerSet.put(p, p);
 			p.setPeerSet(this);
-			return true;
 		}
-		
-		return false;
 	}
 	
-	public synchronized boolean addPeer(String ip, String timestamp, long indexHash)
+	public synchronized void updatePeer(String ip, String timestamp, long indexHash)
 	{
-		return addPeer(new Peer(ip, timestamp, indexHash));
+		updatePeer(new Peer(ip, timestamp, indexHash));
 	}
 	
 	public synchronized boolean removePeer(String ip)
 	{
-		for (Peer p : peerSet)
+		for (Peer p : peerSet.values())
 			if (p.getIpAddress().equals(ip))
 				return removePeer(p);
 		
@@ -50,7 +56,7 @@ public class PeerSet {
 	
 	public synchronized boolean removePeer(Peer p)
 	{
-		if (peerSet.remove(p))
+		if (peerSet.remove(p) != null)
 		{
 			p.setPeerSet(null);
 			return true;
@@ -66,19 +72,21 @@ public class PeerSet {
 	
 	public Iterator<Peer> getPeerListIterator()
 	{
-		return peerSet.iterator();
+		return peerSet.values().iterator();
 	}
 	
 	public class Peer {
 		private String ip;
 		private long indexHash;
 		private PeerSet peerSet;
+		private String timestamp;
 		
 		public Peer(String ip, String timestamp, long indexHash)
 		{
 			this.ip = ip;
 			this.indexHash = indexHash;
 			this.peerSet = null;
+			this.timestamp = timestamp;
 		}
 		
 		public Peer(Peer p)
@@ -114,6 +122,11 @@ public class PeerSet {
 		public long getIndexHash()
 		{
 			return indexHash;
+		}
+		
+		public String getTimestamp()
+		{
+			return timestamp;
 		}
 		
 		public void updateIndexHash(long newHash)

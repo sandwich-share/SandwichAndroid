@@ -49,7 +49,7 @@ import android.os.Environment;
 
 public class Client {
 	private Context context;
-	private PeerSet peers;
+	PeerSet peers;
 	
 	private ArrayList<Thread> searchThreads;
 	private HashMap<PeerSet.Peer, Thread> indexDownloadThreads;
@@ -240,7 +240,7 @@ public class Client {
 		{
 			JSONObject jsonPeer = jsonPeerList.getJSONObject(i);
 
-			peerSet.addPeer(jsonPeer.getString("IP"), jsonPeer.getString("LastSeen"), jsonPeer.getLong("IndexHash"));
+			peerSet.updatePeer(jsonPeer.getString("IP"), jsonPeer.getString("LastSeen"), jsonPeer.getLong("IndexHash"));
 		}
 		
 		return peerSet;
@@ -256,12 +256,12 @@ public class Client {
 	private PeerSet getPeerSetFromDatabase(SQLiteDatabase database) throws SQLiteException
 	{
 		PeerSet peers = new PeerSet();
-		Cursor c = database.query(PEER_TABLE, new String[] {"IP", "IndexHash"}, null, null, null, null, null, null);
+		Cursor c = database.query(PEER_TABLE, new String[] {"IP", "IndexHash", "LastSeen"}, null, null, null, null, null, null);
 		
 		c.moveToFirst();
 		while (!c.isAfterLast())
 		{
-			peers.addPeer(c.getString(0), "FIXME", Long.parseLong(c.getString(1), 10));
+			peers.updatePeer(c.getString(0), c.getString(2), c.getLong(1));
 			c.moveToNext();
 		}
 		
@@ -589,10 +589,7 @@ public class Client {
 			}
 			
 			// Reap dead threads
-			for (Thread t : reapList)
-			{
-				searchThreads.remove(t);
-			}
+			searchThreads.removeAll(reapList);
 		}
 	}
 	
@@ -828,8 +825,11 @@ class IndexDownloadThread extends Thread {
 			vals.put("IndexHash", indexHash);
 			vals.put("LastSeen", timeStamp);
 
-			// We need to insert this into the list
+			// Update the peer entry in the database
 			client.database.insert(Client.PEER_TABLE, null, vals);
+			
+			// Update the peer table in memory
+			client.peers.updatePeer(peer.getIpAddress(), timeStamp, indexHash);
 			
 			System.out.println("Index for "+peer.getIpAddress()+" downloaded (hash: "+peer.getIndexHash()+")");
 		} catch (Exception e) {
