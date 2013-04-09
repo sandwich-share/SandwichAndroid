@@ -376,6 +376,11 @@ public class Client {
 			peers.updatePeerSet(getPeerSetFromDatabase(database));
 			success = peers.getPeerListLength() != 0;
 		} catch (SQLiteException e) {
+			// An exception here means that the SQL database was probably corrupt
+			System.err.println("Rebuilding peer table");
+			database.execSQL("DROP TABLE IF EXISTS "+PEER_TABLE);
+			database.execSQL(CREATE_PEER_TABLE);
+			
 			// Failed to read peer set
 			success = false;
 		}
