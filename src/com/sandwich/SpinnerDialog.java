@@ -48,6 +48,10 @@ public class SpinnerDialog implements Runnable,OnCancelListener {
 		
 		if (progress == null)
 		{
+			// If we're dying, don't bother creating a dialog
+			if (activity.isFinishing())
+				return;
+			
 	    	progress = new ProgressDialog(activity);
 	    	
 	    	progress.setTitle(title);

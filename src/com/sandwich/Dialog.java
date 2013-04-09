@@ -36,6 +36,10 @@ public class Dialog implements Runnable {
 	
 	@Override
 	public void run() {
+		// If we're dying, don't bother creating a dialog
+		if (activity.isFinishing())
+			return;
+		
 		alert = new AlertDialog.Builder(activity).create();
 
     	alert.setTitle(title);
