@@ -21,12 +21,16 @@ import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.media.MediaMetadataRetriever;
 import android.media.MediaPlayer;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
+import android.net.wifi.WifiManager;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
+import android.os.PowerManager;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -56,6 +60,8 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 	private Thread metadataThread;
 	
 	private PendingIntent pi;
+	
+	private WifiManager.WifiLock wlanLock;
 	
 	private String metastring = "";
 	private byte[] albumart = null;
@@ -130,6 +136,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			service.player.setOnErrorListener(service);
 			service.player.setOnPreparedListener(service);
 			service.player.setOnCompletionListener(service);
+			service.player.setWakeMode(activity, PowerManager.PARTIAL_WAKE_LOCK);
 
 			// We want this activity's audio controls to change the music volume
 			activity.setVolumeControlStream(AudioManager.STREAM_MUSIC);
@@ -148,7 +155,8 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			{
 				// Request audio focus
 				int res = am.requestAudioFocus(service, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-				onAudioFocusChange(res);
+				if (res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+					onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN);
 			}
 		}
 		
@@ -174,7 +182,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 				waitDialog = null;
 			}
 			
-			// Drop audio focus and stop
+			// Drop audio focus and WLAN lock then stop
 			if (player.isPlaying())
 			{
 				am.abandonAudioFocus(service);
@@ -280,6 +288,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		albumart = metagetter.getEmbeddedPicture();
 	}
 
+	@TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
 	@Override
 	@SuppressWarnings("deprecation")
 	public void onPrepared(MediaPlayer mp)
@@ -290,6 +299,14 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			waitDialog.dismiss();
 			waitDialog = null;
 		}
+		
+		WifiManager wm = (WifiManager) activity.getSystemService(Context.WIFI_SERVICE);
+		
+		// Create a WLAN lock to maintain wireless capability during playback (not acquired yet)
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1)
+			wlanLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Sandwich Audio Player");
+		else
+			wlanLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL, "Sandwich Audio Player");
 		
 		pi = PendingIntent.getActivity(activity.getApplicationContext(), 0,
                 new Intent(activity.getApplicationContext(), com.sandwich.AudioPlayer.class),
@@ -312,7 +329,8 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		
 		// Request audio focus
 		int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-		onAudioFocusChange(res);
+		if (res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+			onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN);
 		
 		// If we're API level 10+, we have a metadata retreiver that we'll spin off to pull down
 		// album art, artist, and song title. It will also update our notification using the pending
@@ -413,11 +431,39 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		// Unregister audio events
 		activity.unregisterReceiver(audioEventReceiver);
 		
+		// Release the network lock
+		releaseNetworkUseLock();
+		
 		// Set seeker to start
 		seeker.setProgress(0);
 		
 		// Give up audio focus
 		am.abandonAudioFocus(this);
+	}
+	
+	private void acquireNetworkUseLock()
+	{
+		ConnectivityManager cm = (ConnectivityManager) activity.getSystemService(Context.CONNECTIVITY_SERVICE); 
+		NetworkInfo activeNetwork;
+		
+		// Check if our active network is WLAN. If so, we want to get a lock so the device doesn't kill it on us.
+		activeNetwork = cm.getActiveNetworkInfo();
+		if (activeNetwork != null && activeNetwork.getType() == ConnectivityManager.TYPE_WIFI)
+		{	
+			// Acquire the lock
+			System.out.println("Acquiring WLAN lock");
+			wlanLock.acquire();
+		}
+	}
+	
+	private void releaseNetworkUseLock()
+	{
+		// Release the WLAN lock if we have it
+		if (wlanLock.isHeld())
+		{
+			System.out.println("Releasing WLAN lock");
+			wlanLock.release();
+		}
 	}
 
 	@Override
@@ -433,6 +479,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			{
 				activity.unregisterReceiver(audioEventReceiver);
 				player.pause();
+				releaseNetworkUseLock();
 				handler.removeMessages(SHOW_PROGRESS);
 				playpause.setText("Play");
 			}
@@ -442,6 +489,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			if (!player.isPlaying())
 			{
 				// Start playing
+				acquireNetworkUseLock();
 				player.start();
 				handler.sendEmptyMessage(SHOW_PROGRESS);
 				playpause.setText("Pause");
