@@ -389,7 +389,7 @@ public class Client {
 		return readCachedBootstrapData();
 	}
 	
-	private boolean downloadPeerList(String initialPeer) throws NoSuchAlgorithmException, URISyntaxException, IOException, JSONException
+	private void downloadPeerList(String initialPeer) throws NoSuchAlgorithmException, URISyntaxException, IOException, JSONException
 	{
 		URL bootstrapUrl;
 		Iterator<PeerSet.Peer> iterator;
@@ -433,11 +433,13 @@ public class Client {
 				peers.updatePeerSet(getPeerList(bootstrapUrl));
 				
 				// If we get here, bootstrapping was successful
-				return true;
+				return;
 			} catch (Exception e) {
 				// Make sure the network is available
 				if (!isNetworkActive())
-					return false;
+				{
+					throw new IllegalStateException("No network connection available");
+				}
 				
 				// Failed to connect to this one, so prune it
 				selectedPeer.remove();
@@ -458,13 +460,13 @@ public class Client {
 			peers.updatePeerSet(getPeerList(bootstrapUrl));
 			
 			// It worked
-			return true;
+			return;
 		} catch (Exception e) {
 			// Failed to connect to the initial peer, so let's try another one
 		}
 		
 		// We're out of people to bootstrap from
-		return false;
+		throw new IllegalStateException("No peers online");
 	}
 	
 	public void stopBootstrap() throws InterruptedException
@@ -521,10 +523,7 @@ public class Client {
 		Iterator<PeerSet.Peer> iterator;
 
 		// Download the peer list
-		if (!downloadPeerList(initialPeer))
-		{
-			throw new IllegalStateException("No peers available");
-		}
+		downloadPeerList(initialPeer);
 		
 		// Reap threads that aren't still downloading
 		ArrayList<PeerSet.Peer> reapList = new ArrayList<PeerSet.Peer>();
