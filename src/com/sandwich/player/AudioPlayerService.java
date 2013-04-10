@@ -198,9 +198,9 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			}
 			
 			// Drop audio focus and WLAN lock then stop
+			am.abandonAudioFocus(service);
 			if (player.isPlaying())
 			{
-				am.abandonAudioFocus(service);
 				onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS);
 				player.stop();
 			}
@@ -297,7 +297,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		Notification notification = new Notification();
 		notification.tickerText = "Sandwich Audio Player";
 		notification.icon = R.drawable.ic_launcher;
-		notification.flags |= Notification.FLAG_ONGOING_EVENT;
+		notification.flags |= Notification.FLAG_ONGOING_EVENT | Notification.FLAG_ONLY_ALERT_ONCE;
 		notification.setLatestEventInfo(activity.getApplicationContext(), "Sandwich Audio Player",
                 artist + " - " + title, pi);
 		startForeground(NOTIFICATION_ID, notification);
@@ -332,7 +332,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		Notification notification = new Notification();
 		notification.tickerText = "Sandwich Audio Player";
 		notification.icon = R.drawable.ic_launcher;
-		notification.flags |= Notification.FLAG_ONGOING_EVENT;
+		notification.flags |= Notification.FLAG_ONGOING_EVENT | Notification.FLAG_ONLY_ALERT_ONCE;
 		notification.setLatestEventInfo(activity.getApplicationContext(), "Sandwich Audio Player",
                 "", pi);
 		startForeground(NOTIFICATION_ID, notification);

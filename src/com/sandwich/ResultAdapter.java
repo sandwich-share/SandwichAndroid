@@ -89,7 +89,12 @@ public class ResultAdapter extends BaseAdapter {
         }
         
 		TextView textView = (TextView) row;
-		textView.setText(get(id).toString());
+		
+		ResultListener.Result r = get(id);
+		if (r == null)
+			textView.setText("No results");
+		else
+			textView.setText(r.toString());
 		
         return row;
 	}

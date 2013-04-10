@@ -12,6 +12,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.text.ClipboardManager;
 import android.widget.ListView;
+import android.widget.ProgressBar;
 
 import com.sandwich.client.Client;
 import com.sandwich.client.ResultListener;
@@ -21,6 +22,7 @@ public class ClientThread implements Runnable {
 	private Activity activity;
 	private Client client;
 	private SearchListener listener;
+	private ProgressUpdater updater;
 	
 	public ClientThread(Activity activity)
 	{
@@ -159,6 +161,10 @@ public class ClientThread implements Runnable {
         results.setAdapter(new ResultAdapter(activity, R.layout.simplerow));
         results.setOnItemClickListener(listener);
         
+    	// Create the progress bar updater
+        ProgressBar progress = (ProgressBar)activity.findViewById(R.id.updateBar);
+    	updater = new ProgressUpdater(activity, progress);
+        
         // Bootstrap from the cache initially
         client.bootstrapFromCache();
 	}
@@ -180,7 +186,8 @@ public class ClientThread implements Runnable {
 			String initialHost = "isys-ubuntu.case.edu";
 
 			// Bootstrap from network
-			client.bootstrapFromNetwork(initialHost);
+			updater.reset();
+			updater.updateMax(client.bootstrapFromNetwork(initialHost, updater));
 		} catch (Exception e) {
 			Dialog.displayDialog(activity, "Bootstrap Error", e.getMessage(), true);
 			e.printStackTrace();

@@ -1,6 +1,7 @@
 package com.sandwich;
 
 import com.sandwich.client.ResultListener;
+import com.sandwich.client.ResultListener.Result;
 
 import android.os.Bundle;
 import android.view.ContextMenu;
@@ -72,14 +73,17 @@ public class Search extends Activity {
     public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
         super.onCreateContextMenu(menu, v, menuInfo);
         
+        AdapterContextMenuInfo info = (AdapterContextMenuInfo) menuInfo;
+        ResultListener.Result res = (Result) list.getAdapter().getItem(info.position);
+        if (res == null)
+        	return;
+        
         // Inflate the context menu
         MenuInflater inflater = getMenuInflater();
         inflater.inflate(R.menu.context_menu, menu);
         
         // Remove the stream option if it's not streamable
-        AdapterContextMenuInfo info = (AdapterContextMenuInfo) menuInfo;
-        if (!client.isResultStreamable((ResultListener.Result)list.getAdapter().getItem(info.position)))
-        {
+        if (!client.isResultStreamable(res)) {
         	menu.removeItem(R.id.stream);
         }
     }

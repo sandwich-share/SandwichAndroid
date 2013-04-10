@@ -9,6 +9,8 @@ public interface ResultListener {
 	
 	public void searchFailed(String query, String peer, Exception e);
 	
+	public void searchComplete(String query, String peer);
+	
 	public class Result {
 		public String result;
 		public List<String> peers;

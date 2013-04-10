@@ -246,9 +246,9 @@ public class Client {
 		return peerSet;
 	}
 	
-	private Thread startDownloadIndexThreadForPeer(PeerSet.Peer peer)
+	private Thread startDownloadIndexThreadForPeer(PeerSet.Peer peer, IndexDownloadListener listener)
 	{
-		Thread t = new IndexDownloadThread(this, getPeerDatabase(peer), peer);
+		Thread t = new IndexDownloadThread(this, getPeerDatabase(peer), peer, listener);
 		t.start();
 		return t;
 	}
@@ -523,9 +523,10 @@ public class Client {
 		}
 	}
 	
-	public void bootstrapFromNetwork(String initialPeer) throws IOException, JSONException, InterruptedException, NoSuchAlgorithmException, URISyntaxException
+	public int bootstrapFromNetwork(String initialPeer, IndexDownloadListener listener) throws IOException, JSONException, InterruptedException, NoSuchAlgorithmException, URISyntaxException
 	{
 		Iterator<PeerSet.Peer> iterator;
+		int threads = 0;
 
 		// Download the peer list
 		downloadPeerList(initialPeer);
@@ -572,11 +573,14 @@ public class Client {
 						}
 						
 						// No updater running and index is not up to date
-						indexDownloadThreads.put(peer, startDownloadIndexThreadForPeer(peer));
+						indexDownloadThreads.put(peer, startDownloadIndexThreadForPeer(peer, listener));
+						threads++;
 					}
 				}
 			}
 		}
+		
+		return threads;
 	}
 	
 	public void endSearch()
@@ -598,8 +602,15 @@ public class Client {
 		}
 	}
 	
-	public void beginSearch(String query, ResultListener listener) throws IOException
-	{		
+	public int getPeerCount()
+	{
+		return peers.getPeerListLength();
+	}
+	
+	public int beginSearch(String query, ResultListener listener) throws IOException
+	{
+		int threads = 0;
+		
 		if (peers == null)
 		{
 			throw new IllegalStateException("Not bootstrapped");
@@ -620,8 +631,11 @@ public class Client {
 					searchThreads.add(t);
 				}
 				t.start();
+				threads++;
 			}
 		}
+		
+		return threads;
 	}
 
 	@TargetApi(11)
@@ -707,12 +721,14 @@ class IndexDownloadThread extends Thread {
 	SQLiteDatabase peerindex;
 	PeerSet.Peer peer;
 	Client client;
+	IndexDownloadListener listener;
 	
-	public IndexDownloadThread(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer)
+	public IndexDownloadThread(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, IndexDownloadListener listener)
 	{
 		this.client = client;
 		this.peerindex = peerindex;
 		this.peer = peer;
+		this.listener = listener;
 	}
 
 	@Override
@@ -858,6 +874,9 @@ class IndexDownloadThread extends Thread {
 						
 			if (conn != null)
 				conn.disconnect();
+			
+			// Notify the listener
+			listener.indexDownloadComplete(peer.getIpAddress());
 		}
 	}
 }
@@ -908,5 +927,8 @@ class SearchThread extends Thread {
 			// Drop them from the database
 			client.deletePeerFromDatabase(peer);
 		}
+		
+		// Search finished
+		listener.searchComplete(query, peer.getIpAddress());
 	}
 }
