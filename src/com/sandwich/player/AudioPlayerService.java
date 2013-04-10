@@ -76,7 +76,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 	
 	final AudioBinder binder = new AudioBinder(this);
 	
-	final private AudioEventReceiver audioEventReceiver = new AudioEventReceiver(binder);
+	final private AudioEventReceiver audioEventReceiver = new AudioEventReceiver();
 
 	public class AudioBinder extends Binder {
 		private AudioPlayerService service;
@@ -127,6 +127,9 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			player = new MediaPlayer();
 			
 			service.am = (AudioManager)activity.getSystemService(Context.AUDIO_SERVICE);
+			
+			// Initialize the audio event receiver
+			AudioEventReceiver.setPlayer(this);
 			
 			// Add listeners
 			service.playpause.setOnClickListener(service);
@@ -228,6 +231,9 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 				} catch (InterruptedException e) { }
 				metadataThread = null;
 			}
+			
+			// Release the audio event receiver
+			AudioEventReceiver.clearPlayer();
 
 			// Release the player
 			player.release();

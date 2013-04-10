@@ -10,19 +10,26 @@ public class AudioEventReceiver extends BroadcastReceiver
 {
 	static private AudioPlayerService.AudioBinder player;
 	
-	public AudioEventReceiver(AudioPlayerService.AudioBinder player)
-	{
-		// FIXME: Janky
-		AudioEventReceiver.player = player;
-	}
-	
 	public AudioEventReceiver()
 	{
 		// Must have been initialized already
 	}
 	
+	public synchronized static void setPlayer(AudioPlayerService.AudioBinder p)
+	{
+		player = p;
+	}
+	
+	public synchronized static void clearPlayer()
+	{
+		player = null;
+	}
+	
 	@Override
-	public void onReceive(Context context, Intent intent) {
+	public synchronized void onReceive(Context context, Intent intent) {
+		if (player == null)
+			return;
+		
 		if (intent.getAction().equals(AudioManager.ACTION_AUDIO_BECOMING_NOISY))
 		{
 			// Pause playback
