@@ -72,6 +72,8 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 	final static int SHOW_PROGRESS = 12813;
 	final static int NOTIFICATION_ID = 12131;
 	
+	final static int RW_FF_INTERVAL = 750;
+	
 	final AudioBinder binder = new AudioBinder(this);
 	
 	final private AudioEventReceiver audioEventReceiver = new AudioEventReceiver(binder);
@@ -140,6 +142,16 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 
 			// We want this activity's audio controls to change the music volume
 			activity.setVolumeControlStream(AudioManager.STREAM_MUSIC);
+		}
+		
+		public void fastForward()
+		{
+			player.seekTo(player.getCurrentPosition() + RW_FF_INTERVAL);
+		}
+		
+		public void rewind()
+		{
+			player.seekTo(player.getCurrentPosition() - RW_FF_INTERVAL);
 		}
 		
 		public void start()
@@ -343,19 +355,22 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 	}
 
 	@Override
-	// Called when play/pause button is clicked
 	public void onClick(View target) {
-		// If it's playing, pause it. If it's paused, play it.
-		if (player.isPlaying())
+		// We get multiple button events here so we need to classify it
+		if (target == null || target == playpause)
 		{
-			am.abandonAudioFocus(this);
-			onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS);
-		}
-		else
-		{
-			// Request audio focus
-			int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-			onAudioFocusChange(res);
+			// If it's playing, pause it. If it's paused, play it.
+			if (player.isPlaying())
+			{
+				am.abandonAudioFocus(this);
+				onAudioFocusChange(AudioManager.AUDIOFOCUS_LOSS);
+			}
+			else
+			{
+				// Request audio focus
+				int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+				onAudioFocusChange(res);
+			}
 		}
 	}
 

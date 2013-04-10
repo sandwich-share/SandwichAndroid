@@ -36,6 +36,14 @@ public class AudioEventReceiver extends BroadcastReceiver
             	player.play();
             	break;
             	
+            case KeyEvent.KEYCODE_MEDIA_REWIND:
+            	player.rewind();
+            	break;
+            	
+            case KeyEvent.KEYCODE_MEDIA_FAST_FORWARD:
+            	player.fastForward();
+            	break;
+            	
             case KeyEvent.KEYCODE_MEDIA_PAUSE:
             	player.pause();
             	break;

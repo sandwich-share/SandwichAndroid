@@ -652,8 +652,12 @@ public class Client {
 			// Allow the media scanner to pick this file up
 			request.allowScanningByMediaScanner();
 		
-			// Continue showing the notification even after the download finishes
-			request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+			// Workaround for issue 28015 (security exception when using VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+			if (Build.VERSION.SDK_INT > Build.VERSION_CODES.HONEYCOMB_MR2)
+			{
+				// Continue showing the notification even after the download finishes
+				request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+			}
 		}
 		
 		// Give it our title
