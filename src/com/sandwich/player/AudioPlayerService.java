@@ -293,6 +293,9 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 
 		artist = metagetter.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST);
 		title = metagetter.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE);
+		albumart = metagetter.getEmbeddedPicture();
+		if (artist == null || title == null)
+			return;
 		
 		Notification notification = new Notification();
 		notification.tickerText = "Sandwich Audio Player";
@@ -303,7 +306,6 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		startForeground(NOTIFICATION_ID, notification);
 		
 		metastring = artist + " - " + title;
-		albumart = metagetter.getEmbeddedPicture();
 	}
 
 	@TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)

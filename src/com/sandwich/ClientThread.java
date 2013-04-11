@@ -16,6 +16,7 @@ import android.widget.ProgressBar;
 
 import com.sandwich.client.Client;
 import com.sandwich.client.ResultListener;
+import com.sandwich.player.MediaMimeInfo;
 
 @SuppressWarnings("deprecation") // Needed to avoid stupid warnings for older ClipboardManager class
 public class ClientThread implements Runnable {
@@ -164,6 +165,9 @@ public class ClientThread implements Runnable {
     	// Create the progress bar updater
         ProgressBar progress = (ProgressBar)activity.findViewById(R.id.updateBar);
     	updater = new ProgressUpdater(activity, progress);
+    	
+    	// Register our package manager with the MIME class
+    	MediaMimeInfo.registerPackageManager(activity.getPackageManager());
         
         // Bootstrap from the cache initially
         client.bootstrapFromCache();
