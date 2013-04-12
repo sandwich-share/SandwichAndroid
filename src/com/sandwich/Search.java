@@ -6,20 +6,24 @@ import com.sandwich.client.ResultListener.Result;
 import android.os.Bundle;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
+import android.view.KeyEvent;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.View.OnFocusChangeListener;
 import android.view.Window;
+import android.view.inputmethod.EditorInfo;
 import android.widget.AdapterView.AdapterContextMenuInfo;
+import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.ListView;
 import android.app.Activity;
-import android.app.SearchManager;
-import android.content.Intent;
 
-public class Search extends Activity {
-	ClientThread client;
-	Thread thread;
-	ListView list;
+public class Search extends Activity implements TextView.OnEditorActionListener,OnFocusChangeListener {
+	private ClientThread client;
+	private Thread thread;
+	private ListView list;
+	private EditText searchBox;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +38,11 @@ public class Search extends Activity {
 		// Register for context menu on search results
 		list = (ListView) findViewById(R.id.resultsListView);
 		registerForContextMenu(list);
+		
+		// Setup search box
+		searchBox = (EditText) findViewById(R.id.searchBar);
+		searchBox.setOnEditorActionListener(this);
+		searchBox.setOnFocusChangeListener(this);
 
     	// Create the bootstrapper thread
         client = new ClientThread(this);
@@ -42,32 +51,6 @@ public class Search extends Activity {
         // Call UI initialization code from the UI thread
         client.initialize();
 	}
-	
-	@Override
-	public boolean onSearchRequested()
-	{
-        // Start the bootstrapping process if it's not already running
-    	if (thread == null || thread.getState() == Thread.State.TERMINATED)
-    	{
-    		thread = new Thread(client);
-    		thread.start();
-    	}
-		
-		return super.onSearchRequested();
-	}
-	
-    @Override
-    public void onStart()
-    {
-    	super.onStart();
-    	this.onSearchRequested();
-    }
-    
-    @Override
-    public void onBackPressed()
-    {
-    	this.onSearchRequested();
-    }
     
     @Override
     public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
@@ -137,15 +120,28 @@ public class Search extends Activity {
     	
     	super.onDestroy();
     }
-	
+
 	@Override
-	protected void onNewIntent(Intent intent)
-	{
-		// Verify the action and get the query
-	    if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
-	      String query = intent.getStringExtra(SearchManager.QUERY);
-	      System.out.println("Searching: "+query);
-	      client.doSearch(query);
-	    }
+	public boolean onEditorAction(TextView view, int actionId, KeyEvent event) {
+		
+		if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+			String query = view.getText().toString();
+			System.out.println("Searching: "+query);
+			client.doSearch(query);
+		}
+		
+		return false;
+	}
+
+	@Override
+	public void onFocusChange(View view, boolean hasFocus) {
+		if (hasFocus) {
+	        // Start the bootstrapping process if it's not already running
+	    	if (thread == null || thread.getState() == Thread.State.TERMINATED)
+	    	{
+	    		thread = new Thread(client);
+	    		thread.start();
+	    	}
+		}
 	}
 }
