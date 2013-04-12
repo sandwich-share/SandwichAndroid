@@ -85,4 +85,18 @@ public class AudioPlayer implements SandwichPlayer,ServiceConnection {
 			activity.getApplicationContext().unbindService(this);
 		}
 	}
+
+	@Override
+	public void pause() {
+		if (binder != null) {
+			binder.pause();
+		}
+	}
+
+	@Override
+	public void resume() {
+		if (binder != null) {
+			binder.play();
+		}
+	}
 }

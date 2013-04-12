@@ -17,6 +17,8 @@ public class VideoPlayer implements SandwichPlayer,OnErrorListener,OnPreparedLis
 	private VideoView player;
 	private SpinnerDialog waitDialog;
 	
+	private int savedPosition;
+	
 	public VideoPlayer(Activity activity)
 	{
 		this.activity = activity;
@@ -35,6 +37,18 @@ public class VideoPlayer implements SandwichPlayer,OnErrorListener,OnPreparedLis
 		player.setVideoURI(mediaPath);
 		player.setOnErrorListener(this);
 		player.setOnPreparedListener(this);
+	}
+	
+	public void pause()
+	{
+		savedPosition = player.getCurrentPosition();
+		player.pause();
+	}
+	
+	public void resume()
+	{
+		player.seekTo(savedPosition);
+		player.resume();
 	}
 	
 	public void start()
@@ -68,7 +82,7 @@ public class VideoPlayer implements SandwichPlayer,OnErrorListener,OnPreparedLis
 		// Release the player
 		player = null;
 	}
-	
+
 	@Override
 	public boolean onError(MediaPlayer player, int what, int extra)
 	{

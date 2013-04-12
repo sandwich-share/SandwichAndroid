@@ -32,7 +32,30 @@ public class VideoPlayer extends Activity {
 			player.start();
 		} catch (Exception e) {
 			Dialog.displayDialog(this, "Video Playback Error", e.getMessage(), true);
+			
+			if (player != null) {
+				player.release();
+				player = null;
+			}
 		}
+    }
+    
+    @Override
+    protected void onPause()
+    {
+    	super.onPause();
+    	if (player != null) {
+    		player.pause();
+    	}
+    }
+    
+    @Override
+    protected void onResume()
+    {
+    	super.onResume();
+    	if (player != null) {
+    		player.resume();
+    	}
     }
     
     @Override
