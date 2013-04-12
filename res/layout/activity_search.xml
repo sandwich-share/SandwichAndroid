@@ -40,7 +40,7 @@
         android:layout_alignParentLeft="true"
         android:layout_alignParentRight="true"
         android:layout_alignParentTop="true"
-        android:inputType="text"
+        android:inputType="text|textNoSuggestions"
         android:imeOptions="actionSearch"
         android:ems="10"
         android:hint="@string/search_hint" >

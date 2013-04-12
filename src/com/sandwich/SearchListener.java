@@ -8,7 +8,6 @@ import com.sandwich.client.Client;
 import com.sandwich.client.ResultListener;
 
 import android.app.Activity;
-import android.database.Cursor;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -22,11 +21,11 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	private ListView resultsView;
 	private ProgressBar updateBar;
 	
-	private ConcurrentLinkedQueue<ResultAdapter.SearchTuple> results;
+	private ConcurrentLinkedQueue<ResultListener.Result> results;
 	private AtomicInteger searchesFinished;
 	private AtomicBoolean scheduledRun;
 
-	public static final int MAX_RESULTS = Integer.MAX_VALUE;
+	public static final int MAX_RESULTS = 10000;
 		
 	public SearchListener(Activity activity, Client client)
 	{
@@ -38,7 +37,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		this.updateBar = (ProgressBar)activity.findViewById(R.id.updateBar);
 		
 		// Initialize the results list
-		results = new ConcurrentLinkedQueue<ResultAdapter.SearchTuple>();
+		results = new ConcurrentLinkedQueue<ResultListener.Result>();
 		searchesFinished = new AtomicInteger();
 		scheduledRun = new AtomicBoolean();
 	}
@@ -80,7 +79,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	// Called in UI thread to add search result
 	public void run() {
 		ResultAdapter listAdapter = (ResultAdapter)resultsView.getAdapter();
-		ResultAdapter.SearchTuple result;
+		ResultListener.Result result;
 
 		// If we got cancelled, skip it
 		if (scheduledRun.get() == false)
@@ -120,10 +119,21 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 
 	@Override
 	public void searchComplete(String query, String peer) {
-		synchronized (results) {
-			searchesFinished++;
-		}
+		searchesFinished.incrementAndGet();
 		
-		activity.runOnUiThread(this);
+		if (scheduledRun.get() == false) {
+			scheduledRun.set(true);
+			activity.runOnUiThread(this);
+		}
+	}
+
+	@Override
+	public void foundResult(String query, Result result) {
+		results.add(result);
+		
+		if (scheduledRun.get() == false) {
+			scheduledRun.set(true);
+			activity.runOnUiThread(this);
+		}
 	}
 }

@@ -7,8 +7,6 @@ import java.util.List;
 public interface ResultListener {
 	public void foundResult(String query, Result result);
 	
-	public void searchFailed(String query, String peer, Exception e);
-	
 	public void searchComplete(String query, String peer);
 	
 	public class Result {
