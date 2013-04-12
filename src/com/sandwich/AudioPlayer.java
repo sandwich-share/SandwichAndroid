@@ -5,18 +5,26 @@ import com.sandwich.R;
 import com.sandwich.player.SandwichPlayer;
 
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.view.MenuItem;
+import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Intent;
 
 public class AudioPlayer extends Activity {
 	private static SandwichPlayer player;
 	
-    @Override
+    @TargetApi(Build.VERSION_CODES.HONEYCOMB)
+	@Override
     protected void onCreate(Bundle savedInstanceState)
     {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_audio_player);
+        
+        // Make the up button work as back
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
+        	getActionBar().setDisplayHomeAsUpEnabled(true);
         
         // Start the player
         onNewIntent(null);
@@ -71,6 +79,17 @@ public class AudioPlayer extends Activity {
     		player.release();
     		player = null;
     	}
+    }
+    
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) { 
+        switch (item.getItemId()) {
+        case android.R.id.home: 
+            onBackPressed();
+            return true;
+        }
+
+        return super.onOptionsItemSelected(item);
     }
     
     @Override

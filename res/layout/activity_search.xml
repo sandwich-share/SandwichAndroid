@@ -44,8 +44,6 @@
         android:imeOptions="actionSearch"
         android:ems="10"
         android:hint="@string/search_hint" >
-
-        <requestFocus />
     </EditText>
 
 </RelativeLayout>
