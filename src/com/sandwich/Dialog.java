@@ -27,6 +27,8 @@ public class Dialog implements Runnable {
 	{
 		for (Dialog d : rundownDialogs)
 			d.alert.dismiss();
+		
+		rundownDialogs.clear();
 	}
 	
 	public static void displayDialog(Activity activity, String title, String message, boolean endAfterDismiss)

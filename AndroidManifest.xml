@@ -42,7 +42,7 @@
             android:configChanges="orientation|screenSize"
             android:label="@string/title_activity_audio_player"
             android:parentActivityName="com.sandwich.SandwichMain" 
-            android:launchMode="singleTask">
+            android:launchMode="singleInstance">
             <meta-data
                 android:name="android.support.PARENT_ACTIVITY"
                 android:value="com.sandwich.Search" />

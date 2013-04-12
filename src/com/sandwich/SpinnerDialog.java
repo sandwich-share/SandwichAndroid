@@ -35,6 +35,8 @@ public class SpinnerDialog implements Runnable,OnCancelListener {
 	{
 		for (SpinnerDialog d : rundownDialogs)
 			d.progress.dismiss();
+		
+		rundownDialogs.clear();
 	}
 	
 	public void dismiss()
