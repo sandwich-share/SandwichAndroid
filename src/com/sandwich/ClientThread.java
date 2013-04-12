@@ -145,6 +145,10 @@ public class ClientThread implements Runnable {
 		activity.startActivity(Intent.createChooser(shareIntent, "Share to..."));
 	}
 	
+	public void endSearch() {
+		client.endSearch();
+	}
+	
 	public void initialize()
 	{    	
     	if (client != null)

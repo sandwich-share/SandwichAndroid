@@ -1,11 +1,14 @@
 package com.sandwich;
 
-import java.util.ArrayList;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sandwich.client.Client;
 import com.sandwich.client.ResultListener;
 
 import android.app.Activity;
+import android.database.Cursor;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -19,8 +22,11 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	private ListView resultsView;
 	private ProgressBar updateBar;
 	
-	private ArrayList<ResultListener.Result> results;
-	private int searchesFinished;
+	private ConcurrentLinkedQueue<ResultAdapter.SearchTuple> results;
+	private AtomicInteger searchesFinished;
+	private AtomicBoolean scheduledRun;
+
+	public static final int MAX_RESULTS = Integer.MAX_VALUE;
 		
 	public SearchListener(Activity activity, Client client)
 	{
@@ -32,7 +38,9 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		this.updateBar = (ProgressBar)activity.findViewById(R.id.updateBar);
 		
 		// Initialize the results list
-		results = new ArrayList<ResultListener.Result>();
+		results = new ConcurrentLinkedQueue<ResultAdapter.SearchTuple>();
+		searchesFinished = new AtomicInteger();
+		scheduledRun = new AtomicBoolean();
 	}
 	
 	// Called when the search button is clicked
@@ -50,7 +58,8 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		
 		// Initialize the results list
 		results.clear();
-		searchesFinished = 0;
+		searchesFinished.set(0);
+		scheduledRun.set(false);
 		
 		// Start progress bar at 0
 		updateBar.setProgress(0);
@@ -66,44 +75,42 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		// We handled the event so return true
 		return true;
 	}
-
-	@Override
-	// Called for each result found during the search
-	public void foundResult(String query, ResultListener.Result result) {
-		synchronized (results) {
-			results.add(result);
-		}
-		
-		activity.runOnUiThread(this);
-	}
 	
 	@Override
 	// Called in UI thread to add search result
 	public void run() {
 		ResultAdapter listAdapter = (ResultAdapter)resultsView.getAdapter();
-		synchronized (results) {
-			for (ResultListener.Result result : results) {
-				listAdapter.add(result);
-			}
-			
-			// Remove the results we just added
-			results.clear();
-			
-			// Update the progressbar
-			if (updateBar.getProgress() != searchesFinished)
-			{
-				updateBar.setProgress(searchesFinished);
-			
-				// If nothing was found, just add an entry to say nothing was found
-				if ((listAdapter.getCount() == 0) && (searchesFinished == updateBar.getMax()))
-					listAdapter.add(null);
-			}
+		ResultAdapter.SearchTuple result;
+
+		// If we got cancelled, skip it
+		if (scheduledRun.get() == false)
+			return;
+
+		// Add all results
+		for (;;) {
+			result = results.poll();
+			if (result == null)
+				break;
+			listAdapter.add(result);
 		}
-	}
-	
-	@Override
-	public void searchFailed(String query, String peer, Exception e) {
-		Dialog.displayDialog(activity, "Search Error", e.getMessage(), false);
+
+		// If we've added too many results, terminate the search
+		if (listAdapter.getCount() > MAX_RESULTS)
+			sandwichClient.endSearch();
+			
+		// Update the progressbar
+		int capturedSearchesFinished = searchesFinished.get();
+		if (updateBar.getProgress() != capturedSearchesFinished)
+		{
+			updateBar.setProgress(capturedSearchesFinished);
+
+			// If nothing was found, just add an entry to say nothing was found
+			if ((listAdapter.getCount() == 0) && (capturedSearchesFinished == updateBar.getMax()))
+				listAdapter.add(null);
+		}
+
+		// Run is finished
+		scheduledRun.set(false);
 	}
 
 	@Override
