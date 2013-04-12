@@ -25,6 +25,7 @@ public class ClientThread implements Runnable {
 	private Client client;
 	private SearchListener listener;
 	private ProgressUpdater updater;
+	private boolean loadedCache;
 	
 	public ClientThread(Activity activity)
 	{
@@ -173,9 +174,6 @@ public class ClientThread implements Runnable {
     	
     	// Register our package manager with the MIME class
     	MediaMimeInfo.registerPackageManager(activity.getPackageManager());
-        
-        // Bootstrap from the cache initially
-        client.bootstrapFromCache();
 	}
 	
 	public void release()
@@ -191,6 +189,12 @@ public class ClientThread implements Runnable {
 		if (client == null)
 			throw new IllegalStateException("Bootstrap thread was not initialized");
 
+        if (!loadedCache) {
+        	// Bootstrap from the cache initially
+        	client.bootstrapFromCache();
+        	loadedCache = true;
+        }
+		
 		try {
 			String initialHost = "isys-ubuntu.case.edu";
 
