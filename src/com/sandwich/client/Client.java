@@ -29,6 +29,7 @@ import org.json.JSONObject;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.sandwich.SearchListener;
 import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.player.MediaMimeInfo;
 
@@ -906,7 +907,9 @@ class SearchThread extends Thread {
 	@Override
 	public void run() {
 		try {
-			Cursor c = peerindex.query(Client.getTableNameForPeer(peer), new String[] {"FileName", "CheckSum"}, "FileName LIKE '%"+query+"%'" , null, null, null, null, null);
+			Cursor c = peerindex.query(Client.getTableNameForPeer(peer),
+					new String[] {"FileName", "CheckSum"}, "FileName LIKE '%"+query+"%'",
+					null, null, null, null, ""+SearchListener.MAX_RESULTS);
 			
 			// Iterate the cursor
 			c.moveToFirst();

@@ -67,7 +67,6 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		// Execute the asynchronous search with the client
 		try {
 			updateBar.setMax(sandwichClient.beginSearch(query, this));
-			System.out.println("Search started: "+updateBar.getMax());
 		} catch (Exception e) {
 			e.printStackTrace();
 			Dialog.displayDialog(activity, "Search Error", e.getMessage(), false);
