@@ -56,6 +56,15 @@ public class AudioPlayer implements SandwichPlayer,ServiceConnection {
 			binder.start();
 		}
 	}
+	
+	@Override
+	public boolean isPlaying() {
+		if (binder != null) {
+			return binder.isPlaying();
+		} else {
+			return false;
+		}
+	}
 
 	@Override
 	public void stop() {

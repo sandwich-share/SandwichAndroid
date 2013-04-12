@@ -12,4 +12,6 @@ public interface SandwichPlayer {
 	public void stop();
 	
 	public void release();
+	
+	public boolean isPlaying();
 }

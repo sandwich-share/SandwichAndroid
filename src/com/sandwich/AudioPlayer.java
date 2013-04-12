@@ -57,6 +57,10 @@ public class AudioPlayer extends Activity {
     {
 		Intent i = new Intent(this, com.sandwich.Search.class);
 		startActivity(i);
+		
+		if (!player.isPlaying()) {
+			super.onBackPressed();
+		}
     }
     
     private void killPlayer()

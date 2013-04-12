@@ -104,6 +104,11 @@ public class VideoPlayer implements SandwichPlayer,OnErrorListener,OnPreparedLis
 		Dialog.displayDialog(activity, "Streaming Error", error, true);
 		return true;
 	}
+	
+	@Override
+	public boolean isPlaying() {
+		return (player != null && player.isPlaying());
+	}
 
 	@Override
 	public void onPrepared(MediaPlayer arg0)

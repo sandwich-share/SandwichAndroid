@@ -175,6 +175,11 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			}
 		}
 		
+		public boolean isPlaying()
+		{
+			return player.isPlaying();
+		}
+		
 		public void pause()
 		{
 			// Abandon audio focus
