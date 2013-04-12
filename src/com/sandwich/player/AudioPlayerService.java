@@ -95,6 +95,11 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			service.playpause = (Button)activity.findViewById(R.id.playButton);
 			service.timeView = (TextView)activity.findViewById(R.id.timeView);
 			
+			TextView metaText = (TextView)activity.findViewById(R.id.songText);
+			metaText.setText("");
+			ImageView artView = (ImageView)activity.findViewById(R.id.albumArt);
+			artView.setImageBitmap(null);
+			
 			handler = new Handler()
 			{
 			    @Override

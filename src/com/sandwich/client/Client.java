@@ -29,6 +29,7 @@ import org.json.JSONObject;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.player.MediaMimeInfo;
 
 import android.annotation.TargetApi;
@@ -491,9 +492,9 @@ public class Client {
 		}
 	}
 	
-	public String getUriForResult(String peer, ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
+	public static String getUriForResult(Peer peer, ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
 	{
-		return createPeerUrlString(peer, "/file", "path="+result.result);
+		return getPeerUrlForFile(peer, result.result);
 	}
 	
 	public boolean isResultStreamable(ResultListener.Result result)
@@ -639,7 +640,7 @@ public class Client {
 	}
 
 	@TargetApi(11)
-	public void startFileDownloadFromPeer(String peer, String file) throws URISyntaxException, UnknownHostException, NoSuchAlgorithmException
+	public void startFileDownloadFromPeer(Peer peer, String file) throws URISyntaxException, UnknownHostException, NoSuchAlgorithmException
 	{
 		DownloadManager downloader = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
 		DownloadManager.Request request;
@@ -651,7 +652,7 @@ public class Client {
 		if (title.lastIndexOf("/") > 0)
 			title = title.substring(title.lastIndexOf("/")+1);
 
-		url = createPeerUrlString(peer, "/file", "path="+file);
+		url = getPeerUrlForFile(peer, file);
 		
 		System.out.println("Downloading URL: "+url+" ("+title+")");
 
@@ -681,13 +682,18 @@ public class Client {
 		downloader.enqueue(request);
 	}
 	
-	public boolean startFileStreamFromPeer(Activity activity, String peer, String file) throws NoSuchAlgorithmException, URISyntaxException, IOException
+	public static String getPeerUrlForFile(Peer peer, String file) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
+	{
+		return createPeerUrlString(peer.getIpAddress(), "/files/"+file, null);
+	}
+	
+	public boolean startFileStreamFromPeer(Activity activity, Peer peer, String file) throws NoSuchAlgorithmException, URISyntaxException, IOException
 	{
 		String url;
 		String mimeType;
 
 		mimeType = MediaMimeInfo.getMimeTypeForPath(file);
-		url = createPeerUrlString(peer, "/file", "path="+file);
+		url = getPeerUrlForFile(peer, file);
 		if (mimeType == null)
 		{
 			// Undetermined MIME type
@@ -750,7 +756,7 @@ class IndexDownloadThread extends Thread {
 		client.deletePeerFromDatabase(peer);
 		try {
 			// Build the query index URL
-			queryUrl = new URL(Client.createPeerUrlString(peer.getIpAddress(), "/indexfor", null));
+			queryUrl = new URL(Client.createPeerUrlString(peer.getIpAddress(), "/fileindex", null));
 			
 			// Connect a URL connection
 			conn = Client.createHttpConnection(queryUrl, false);
@@ -909,7 +915,7 @@ class SearchThread extends Thread {
 				String file = c.getString(0);
 				int checksum = c.getInt(1);
 				if (!isInterrupted())
-					listener.foundResult(query, new ResultListener.Result(peer.getIpAddress(), file, checksum));
+					listener.foundResult(query, new ResultListener.Result(peer, file, checksum));
 				else
 				{
 					System.out.println("Search on "+peer.getIpAddress()+" was interrupted");
@@ -929,6 +935,6 @@ class SearchThread extends Thread {
 		}
 		
 		// Search finished
-		listener.searchComplete(query, peer.getIpAddress());
+		listener.searchComplete(query, peer);
 	}
 }
