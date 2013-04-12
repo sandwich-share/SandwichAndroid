@@ -4,12 +4,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-public interface ResultListener {
-	public void foundResult(String query, Result result);
-	
-	public void searchFailed(String query, String peer, Exception e);
-	
-	public void searchComplete(String query, String peer);
+import android.database.Cursor;
+
+public interface ResultListener {	
+	public void searchComplete(String query, String peer, Cursor cursor);
 	
 	public class Result {
 		public String result;

@@ -1,12 +1,12 @@
 package com.sandwich;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 
 import com.sandwich.client.ResultListener;
 
 import android.app.Activity;
 import android.content.Context;
-import android.util.SparseArray;
+import android.database.Cursor;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,63 +14,67 @@ import android.widget.BaseAdapter;
 import android.widget.TextView;
 
 public class ResultAdapter extends BaseAdapter {
-	private SparseArray<ResultListener.Result> adapterTable;
-	private HashMap<ResultListener.Result, Integer> mirror;
 	private Context context;
 	private int rowResourceId;
+	private ArrayList<SearchTuple> cursors;
+	private int count;
 	
 	public ResultAdapter(Context context, int rowResourceId)
 	{
 		this.context = context;
 		this.rowResourceId = rowResourceId;
-		this.adapterTable = new SparseArray<ResultListener.Result>();
-		this.mirror = new HashMap<ResultListener.Result, Integer>();
+		this.cursors = new ArrayList<SearchTuple>();
 	}
-	
-	public boolean add(ResultListener.Result result) {
-		if (mirror.containsKey(result))
-		{
-			ResultListener.Result existingResult = adapterTable.get(mirror.get(result));
-			existingResult.addPeers(result.peers);
-		}
-		else
-		{
-			adapterTable.put(adapterTable.size(), result);
-			mirror.put(result, mirror.size());
-			notifyDataSetChanged();
-		}
-		return true;
+
+	public void add(SearchTuple c) {
+		cursors.add(c);
+		count += c.cursor.getCount();
+		notifyDataSetChanged();
 	}
-	
-	public ResultListener.Result remove(int id) {
-		ResultListener.Result result = adapterTable.get(id);
-		if (result != null)
-		{
-			adapterTable.remove(id);
-			mirror.remove(result);
-			notifyDataSetChanged();
-		}
-		return result;
-	}
-	
+
 	public void clear() {
-		adapterTable.clear();
-		mirror.clear();
+		cursors.clear();
 		notifyDataSetChanged();
 	}
 	
-	public ResultListener.Result get(int id) {
-		return adapterTable.get(id);
+	private String getText(int id) {
+		for (SearchTuple tuple : cursors)
+		{
+			if (id >= tuple.cursor.getCount())
+				id -= tuple.cursor.getCount();
+			else
+			{
+				tuple.cursor.moveToPosition(id);
+				return tuple.cursor.getString(0);
+			}
+		}
+		
+		return null;
+	}
+	
+	private ResultListener.Result get(int id) {
+		for (SearchTuple tuple : cursors)
+		{
+			if (id >= tuple.cursor.getCount())
+				id -= tuple.cursor.getCount();
+			else
+			{
+				tuple.cursor.moveToPosition(id);
+				return new ResultListener.Result(tuple.peer, tuple.cursor.getString(0), tuple.cursor.getInt(1));
+			}
+		}
+		
+		return null;
 	}
 	
 	@Override
 	public int getCount() {
-		return adapterTable.size();
+		return count;
 	}
 
 	@Override
 	public Object getItem(int index) {
-		return adapterTable.get(index);
+		return get(index);
 	}
 
 	@Override
@@ -89,13 +93,19 @@ public class ResultAdapter extends BaseAdapter {
         }
         
 		TextView textView = (TextView) row;
-		
-		ResultListener.Result r = get(id);
-		if (r == null)
-			textView.setText("No results");
-		else
-			textView.setText(r.toString());
+		textView.setText(getText(id));
 		
         return row;
+	}
+	
+	public static class SearchTuple {
+		public Cursor cursor;
+		public String peer;
+		
+		public SearchTuple(String peer, Cursor cursor)
+		{
+			this.cursor = cursor;
+			this.peer = peer;
+		}
 	}
 }

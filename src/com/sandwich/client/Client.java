@@ -899,25 +899,9 @@ class SearchThread extends Thread {
 
 	@Override
 	public void run() {
+		Cursor c;
 		try {
-			Cursor c = peerindex.query(Client.getTableNameForPeer(peer), new String[] {"FileName", "CheckSum"}, "FileName LIKE '%"+query+"%'" , null, null, null, null, null);
-			
-			// Iterate the cursor
-			c.moveToFirst();
-			while (!c.isAfterLast())
-			{
-				String file = c.getString(0);
-				int checksum = c.getInt(1);
-				if (!isInterrupted())
-					listener.foundResult(query, new ResultListener.Result(peer.getIpAddress(), file, checksum));
-				else
-				{
-					System.out.println("Search on "+peer.getIpAddress()+" was interrupted");
-					break;
-				}
-				c.moveToNext();
-			}
-			c.close();
+			c = peerindex.query(Client.getTableNameForPeer(peer), new String[] {"FileName", "CheckSum"}, "FileName LIKE '%"+query+"%'" , null, null, null, null, null);
 		} catch (SQLiteException e) {
 			System.err.println("Failed to search index for peer: "+peer.getIpAddress());
 			
@@ -926,9 +910,11 @@ class SearchThread extends Thread {
 			
 			// Drop them from the database
 			client.deletePeerFromDatabase(peer);
+			
+			c = null;
 		}
 		
 		// Search finished
-		listener.searchComplete(query, peer.getIpAddress());
+		listener.searchComplete(query, peer.getIpAddress(), c);
 	}
 }

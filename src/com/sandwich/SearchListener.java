@@ -25,7 +25,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	private ConcurrentLinkedQueue<ResultAdapter.SearchTuple> results;
 	private AtomicInteger searchesFinished;
 	private AtomicBoolean scheduledRun;
-
+	
 	public static final int MAX_RESULTS = Integer.MAX_VALUE;
 		
 	public SearchListener(Activity activity, Client client)
@@ -81,11 +81,11 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	public void run() {
 		ResultAdapter listAdapter = (ResultAdapter)resultsView.getAdapter();
 		ResultAdapter.SearchTuple result;
-
+		
 		// If we got cancelled, skip it
 		if (scheduledRun.get() == false)
 			return;
-
+		
 		// Add all results
 		for (;;) {
 			result = results.poll();
@@ -103,7 +103,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		if (updateBar.getProgress() != capturedSearchesFinished)
 		{
 			updateBar.setProgress(capturedSearchesFinished);
-
+		
 			// If nothing was found, just add an entry to say nothing was found
 			if ((listAdapter.getCount() == 0) && (capturedSearchesFinished == updateBar.getMax()))
 				listAdapter.add(null);
@@ -119,11 +119,14 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	}
 
 	@Override
-	public void searchComplete(String query, String peer) {
-		synchronized (results) {
-			searchesFinished++;
+	public void searchComplete(String query, String peer, Cursor cursor) {
+		searchesFinished.incrementAndGet();
+		results.add(new ResultAdapter.SearchTuple(peer, cursor));
+
+		if (scheduledRun.get() == false) {
+			scheduledRun.set(true);
+			activity.runOnUiThread(this);
 		}
-		
-		activity.runOnUiThread(this);
 	}
+
 }
