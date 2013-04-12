@@ -1,5 +1,6 @@
 package com.sandwich.client;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -13,17 +14,34 @@ public class PeerSet {
 	
 	public synchronized void updatePeerSet(PeerSet peers)
 	{
-		// Clear peer set first
-		peerSet.clear();
+		// Mark old peers
+		for (Peer p : peerSet.values())
+		{
+			p.tagged = true;
+		}
 		
 		// Add a copy of each peer into our peer set
 		for (Peer p : peers.peerSet.values())
 		{
 			updatePeer(new Peer(p));
 		}
+		
+		// Add peers that weren't updated to reaper list
+		ArrayList<Peer> peersToReap = new ArrayList<Peer>();
+		for (Peer p : peerSet.values())
+		{
+			if (p.tagged)
+				peersToReap.add(p);
+		}
+		
+		// Reap peers that weren't updated
+		for (Peer p : peersToReap)
+		{
+			removePeer(p);
+		}
 	}
-	
-	public synchronized void updatePeer(Peer p)
+
+	private synchronized void updatePeer(Peer p)
 	{
 		Peer oldPeer = peerSet.get(p);
 		if (oldPeer != null)
@@ -31,6 +49,8 @@ public class PeerSet {
 			// Update an existing peer
 			oldPeer.indexHash = p.indexHash;
 			oldPeer.timestamp = p.timestamp;
+			if (p.version != Peer.VERSION_UNSPECIFIED)
+				oldPeer.version = p.version;
 		}
 		else
 		{
@@ -40,9 +60,9 @@ public class PeerSet {
 		}
 	}
 	
-	public synchronized void updatePeer(String ip, String timestamp, long indexHash)
+	public synchronized void updatePeer(String ip, String timestamp, long indexHash, int version)
 	{
-		updatePeer(new Peer(ip, timestamp, indexHash));
+		updatePeer(new Peer(ip, timestamp, indexHash, version));
 	}
 	
 	public synchronized boolean removePeer(String ip)
@@ -80,13 +100,20 @@ public class PeerSet {
 		private long indexHash;
 		private PeerSet peerSet;
 		private String timestamp;
+		private int version;
+		private boolean tagged;
 		
-		public Peer(String ip, String timestamp, long indexHash)
+		public final static int VERSION_UNSPECIFIED = 0;
+		public final static int VERSION_1_0 = 1;
+		public final static int VERSION_1_1 = 2;
+		
+		public Peer(String ip, String timestamp, long indexHash, int version)
 		{
 			this.ip = ip;
 			this.indexHash = indexHash;
 			this.peerSet = null;
 			this.timestamp = timestamp;
+			this.version = version;
 		}
 		
 		public Peer(Peer p)
@@ -94,6 +121,17 @@ public class PeerSet {
 			this.ip = p.ip;
 			this.indexHash = p.indexHash;
 			this.peerSet = null;
+			this.version = p.version;
+		}
+		
+		public int getVersion()
+		{
+			return version;
+		}
+		
+		public void setVersion(int version)
+		{
+			this.version = version;
 		}
 		
 		private void setPeerSet(PeerSet peerSet)

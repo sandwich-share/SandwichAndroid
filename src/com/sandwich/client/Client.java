@@ -29,6 +29,7 @@ import org.json.JSONObject;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.player.MediaMimeInfo;
 
 import android.annotation.TargetApi;
@@ -57,7 +58,7 @@ public class Client {
 	SQLiteDatabase database;
 	private HashMap<PeerSet.Peer, SQLiteDatabase> peerDatabases;
 	
-	private static final String CREATE_PEER_TABLE = "CREATE TABLE IF NOT EXISTS peers (IP TEXT PRIMARY KEY, IndexHash INT, LastSeen TEXT);";
+	private static final String CREATE_PEER_TABLE = "CREATE TABLE IF NOT EXISTS peers (IP TEXT PRIMARY KEY, IndexHash INT, LastSeen TEXT, Version INT);";
 
 	static final String PEER_TABLE = "peers";
 	static final String PEER_DB = "peers.db";
@@ -198,7 +199,7 @@ public class Client {
 		responseCode = sendGetRequest(conn);
 		if (responseCode != HttpURLConnection.HTTP_OK)
 		{
-			throw new ConnectException("Failed to get peer list from bootstrap peer");
+			return null;
 		}
 		
 		return conn.getInputStream();
@@ -240,7 +241,7 @@ public class Client {
 		{
 			JSONObject jsonPeer = jsonPeerList.getJSONObject(i);
 
-			peerSet.updatePeer(jsonPeer.getString("IP"), jsonPeer.getString("LastSeen"), jsonPeer.getLong("IndexHash"));
+			peerSet.updatePeer(jsonPeer.getString("IP"), jsonPeer.getString("LastSeen"), jsonPeer.getLong("IndexHash"), Peer.VERSION_UNSPECIFIED);
 		}
 		
 		return peerSet;
@@ -256,12 +257,12 @@ public class Client {
 	private PeerSet getPeerSetFromDatabase(SQLiteDatabase database) throws SQLiteException
 	{
 		PeerSet peers = new PeerSet();
-		Cursor c = database.query(PEER_TABLE, new String[] {"IP", "IndexHash", "LastSeen"}, null, null, null, null, null, null);
+		Cursor c = database.query(PEER_TABLE, new String[] {"IP", "IndexHash", "LastSeen", "Version"}, null, null, null, null, null, null);
 		
 		c.moveToFirst();
 		while (!c.isAfterLast())
 		{
-			peers.updatePeer(c.getString(0), c.getString(2), c.getLong(1));
+			peers.updatePeer(c.getString(0), c.getString(2), c.getLong(1), c.getInt(3));
 			c.moveToNext();
 		}
 		
@@ -491,9 +492,9 @@ public class Client {
 		}
 	}
 	
-	public String getUriForResult(String peer, ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
+	public static String getUriForResult(Peer peer, ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
 	{
-		return createPeerUrlString(peer, "/file", "path="+result.result);
+		return getUriForFile(peer, result.result);
 	}
 	
 	public boolean isResultStreamable(ResultListener.Result result)
@@ -566,7 +567,7 @@ public class Client {
 						oldHash = getOldHashOfPeerIndex(peer);
 						if (oldHash == peer.getIndexHash())
 						{
-							System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
+							System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+" | version: "+peer.getVersion()+")");
 							
 							// Don't download anything
 							continue;
@@ -637,9 +638,21 @@ public class Client {
 		
 		return threads;
 	}
+	
+	private static String getUriForFile(Peer peer, String file) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
+	{
+		if (peer.getVersion() >= Peer.VERSION_1_1)
+		{
+			return createPeerUrlString(peer.getIpAddress(), "/files/"+file, null);
+		}
+		else
+		{
+			return createPeerUrlString(peer.getIpAddress(), "/file", "path="+file);
+		}
+	}
 
 	@TargetApi(11)
-	public void startFileDownloadFromPeer(String peer, String file) throws URISyntaxException, UnknownHostException, NoSuchAlgorithmException
+	public void startFileDownloadFromPeer(Peer peer, String file) throws URISyntaxException, UnknownHostException, NoSuchAlgorithmException
 	{
 		DownloadManager downloader = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
 		DownloadManager.Request request;
@@ -651,7 +664,7 @@ public class Client {
 		if (title.lastIndexOf("/") > 0)
 			title = title.substring(title.lastIndexOf("/")+1);
 
-		url = createPeerUrlString(peer, "/file", "path="+file);
+		url = createPeerUrlString(peer.getIpAddress(), "/file", "path="+file);
 		
 		System.out.println("Downloading URL: "+url+" ("+title+")");
 
@@ -681,13 +694,13 @@ public class Client {
 		downloader.enqueue(request);
 	}
 	
-	public boolean startFileStreamFromPeer(Activity activity, String peer, String file) throws NoSuchAlgorithmException, URISyntaxException, IOException
+	public boolean startFileStreamFromPeer(Activity activity, Peer peer, String file) throws NoSuchAlgorithmException, URISyntaxException, IOException
 	{
 		String url;
 		String mimeType;
 
 		mimeType = MediaMimeInfo.getMimeTypeForPath(file);
-		url = createPeerUrlString(peer, "/file", "path="+file);
+		url = getUriForFile(peer, file);
 		if (mimeType == null)
 		{
 			// Undetermined MIME type
@@ -748,136 +761,178 @@ class IndexDownloadThread extends Thread {
 		
 		// Drop the tables and rows for this peer
 		client.deletePeerFromDatabase(peer);
-		try {
-			// Build the query index URL
-			queryUrl = new URL(Client.createPeerUrlString(peer.getIpAddress(), "/indexfor", null));
-			
-			// Connect a URL connection
-			conn = Client.createHttpConnection(queryUrl, false);
-			
-			// Get an input stream from the GET request on this URL
-			in = Client.getInputStreamFromConnection(conn);
-			
-			// Create the required table
-			peerindex.execSQL("CREATE TABLE IF NOT EXISTS "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY, Size INTEGER, Checksum INTEGER);");
-			
-			// Compile the database insert so we don't have to do it each time
-			SQLiteStatement insertStmt = peerindex.compileStatement("INSERT OR REPLACE INTO "+Client.getTableNameForPeer(peer)+" VALUES (?1, ?2, ?3);");
 
-			// Read from the GET response
-			JsonFactory jfactory = new JsonFactory();
-			JsonParser parser = jfactory.createJsonParser(new BufferedInputStream(in));
-			
-			// Begin immediate transaction
-			peerindex.execSQL("BEGIN IMMEDIATE TRANSACTION");
+		// Handle unspecified version
+		if (peer.getVersion() == Peer.VERSION_UNSPECIFIED)
+			peer.setVersion(Peer.VERSION_1_0);
+		
+		int startVersion = peer.getVersion();
+		boolean success = false;
+		do
+		{
 			try {
-				// Parse the index object
-				parser.nextToken();
-				while (parser.nextToken() != JsonToken.END_OBJECT)
+				if (peer.getVersion() >= Peer.VERSION_1_1)
 				{
-					String ioname = parser.getCurrentName();
-					
-					if (ioname.equals("IndexHash"))
+					// Build the 1.1 query index URL
+					queryUrl = new URL(Client.createPeerUrlString(peer.getIpAddress(), "/fileindex", null));
+				}
+				else
+				{
+					// Otherwise use 1.0
+					queryUrl = new URL(Client.createPeerUrlString(peer.getIpAddress(), "/indexfor", null));
+				}
+				
+				// Connect a URL connection
+				conn = Client.createHttpConnection(queryUrl, false);
+
+				// Get an input stream from the GET request on this URL
+				in = Client.getInputStreamFromConnection(conn);
+				if (in == null)
+				{
+					throw new ConnectException("Failed to connect");
+				}
+
+				// Create the required table
+				peerindex.execSQL("CREATE TABLE IF NOT EXISTS "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY, Size INTEGER, Checksum INTEGER);");
+
+				// Compile the database insert so we don't have to do it each time
+				SQLiteStatement insertStmt = peerindex.compileStatement("INSERT OR REPLACE INTO "+Client.getTableNameForPeer(peer)+" VALUES (?1, ?2, ?3);");
+
+				// Read from the GET response
+				JsonFactory jfactory = new JsonFactory();
+				JsonParser parser = jfactory.createJsonParser(new BufferedInputStream(in));
+
+				// Begin immediate transaction
+				peerindex.execSQL("BEGIN IMMEDIATE TRANSACTION");
+				try {
+					// Parse the index object
+					parser.nextToken();
+					while (parser.nextToken() != JsonToken.END_OBJECT)
 					{
-						parser.nextToken();
-						indexHash = parser.getLongValue();
-						gotIndexHash = true;
-					}
-					else if (ioname.equals("TimeStamp"))
-					{
-						parser.nextToken();
-						timeStamp = parser.getText();
-					}
-					else if (ioname.equals("List"))
-					{
-						parser.nextToken();
-						while (parser.nextToken() != JsonToken.END_ARRAY)
-						{							
-							while (parser.nextToken() != JsonToken.END_OBJECT)
-							{
-								String foname = parser.getCurrentName();
-								
-								if (foname.equals("FileName"))
+						String ioname = parser.getCurrentName();
+
+						if (ioname.equals("IndexHash"))
+						{
+							parser.nextToken();
+							indexHash = parser.getLongValue();
+							gotIndexHash = true;
+						}
+						else if (ioname.equals("TimeStamp"))
+						{
+							parser.nextToken();
+							timeStamp = parser.getText();
+						}
+						else if (ioname.equals("List"))
+						{
+							parser.nextToken();
+							while (parser.nextToken() != JsonToken.END_ARRAY)
+							{							
+								while (parser.nextToken() != JsonToken.END_OBJECT)
 								{
-									parser.nextToken();
-									insertStmt.bindString(1, parser.getText());
+									String foname = parser.getCurrentName();
+
+									if (foname.equals("FileName"))
+									{
+										parser.nextToken();
+										insertStmt.bindString(1, parser.getText());
+									}
+									else if (foname.equals("CheckSum"))
+									{
+										parser.nextToken();
+										insertStmt.bindLong(3, parser.getLongValue());
+									}
+									else if (foname.equals("Size"))
+									{
+										parser.nextToken();
+										insertStmt.bindLong(2, parser.getLongValue());
+									}
+									else
+									{
+										parser.nextToken();
+									}
+
+									insertStmt.execute();
+									insertStmt.clearBindings();
 								}
-								else if (foname.equals("CheckSum"))
-								{
-									parser.nextToken();
-									insertStmt.bindLong(3, parser.getLongValue());
-								}
-								else if (foname.equals("Size"))
-								{
-									parser.nextToken();
-									insertStmt.bindLong(2, parser.getLongValue());
-								}
-								else
-								{
-									parser.nextToken();
-								}
-								
-								insertStmt.execute();
-								insertStmt.clearBindings();
+
+								if (isInterrupted()) throw new InterruptedException();
 							}
-							
-							if (isInterrupted()) throw new InterruptedException();
+						}
+						else
+						{
+							parser.nextToken();
 						}
 					}
-					else
-					{
-						parser.nextToken();
-					}
-				}
-			} finally {
-				// Commit transaction
-				peerindex.execSQL("END TRANSACTION");
-				
-				// Delete the precompiled statement
-				insertStmt.close();
-				
-				// Close the JSON parser
-				parser.close();
-			}
-			
-			// Check if we got the header properly
-			if (timeStamp == null || !gotIndexHash)
-				throw new IllegalStateException("No header found in JSON file index");
-			
-			// Create the values to be stored in the SQL database
-			ContentValues vals = new ContentValues();
-			vals.put("IP", peer.getIpAddress());
-			vals.put("IndexHash", indexHash);
-			vals.put("LastSeen", timeStamp);
+				} finally {
+					// Commit transaction
+					peerindex.execSQL("END TRANSACTION");
 
-			// Update the peer entry in the database
-			client.database.insert(Client.PEER_TABLE, null, vals);
-			
-			// Update the peer table in memory
-			client.peers.updatePeer(peer.getIpAddress(), timeStamp, indexHash);
-			
-			System.out.println("Index for "+peer.getIpAddress()+" downloaded (hash: "+peer.getIndexHash()+")");
-		} catch (Exception e) {
+					// Delete the precompiled statement
+					insertStmt.close();
+
+					// Close the JSON parser
+					parser.close();
+				}
+
+				// Check if we got the header properly
+				if (timeStamp == null || !gotIndexHash)
+					throw new IllegalStateException("No header found in JSON file index");
+
+				// Create the values to be stored in the SQL database
+				ContentValues vals = new ContentValues();
+				vals.put("IP", peer.getIpAddress());
+				vals.put("IndexHash", indexHash);
+				vals.put("LastSeen", timeStamp);
+				vals.put("Version", peer.getVersion());
+
+				// Update the peer entry in the database
+				client.database.insert(Client.PEER_TABLE, null, vals);
+
+				// Update the peer table in memory
+				client.peers.updatePeer(peer.getIpAddress(), timeStamp, indexHash, peer.getVersion());
+
+				System.out.println("Index for "+peer.getIpAddress()+" downloaded (hash: "+peer.getIndexHash()+")");
+				success = true;
+				break;
+			} catch (Exception e) {
+				// Try the next version
+				peer.setVersion(peer.getVersion() + 1);
+
+				// Check for rollover
+				if (peer.getVersion() > Peer.VERSION_1_1)
+					peer.setVersion(Peer.VERSION_1_0);
+
+				// Check if we've reached where we started
+				if (startVersion == peer.getVersion())
+					break;
+				
+				continue;
+			} finally {
+				// Cleanup the socket and reader
+				try {
+					if (in != null)
+						in.close();
+				} catch (IOException e) {}
+
+				if (conn != null)
+					conn.disconnect();
+			}
+		} while (true);
+
+		if (!success) {
 			System.err.println("Failed to download index for peer: "+peer.getIpAddress());
-			
+
 			// Remove this peer from the peer set
 			peer.remove();
 
 			// Remove them from the database
 			client.deletePeerFromDatabase(peer);
-		} finally {
-			// Cleanup the socket and reader
-			try {
-				if (in != null)
-					in.close();
-			} catch (IOException e) {}
-						
-			if (conn != null)
-				conn.disconnect();
-			
-			// Notify the listener
-			listener.indexDownloadComplete(peer.getIpAddress());
+		} else {
+			System.out.println("Peer "+peer.getIpAddress()+" is version "+peer.getVersion());
 		}
+
+		// Notify the listener
+		listener.indexDownloadComplete(peer.getIpAddress());
 	}
 }
 
@@ -909,7 +964,7 @@ class SearchThread extends Thread {
 				String file = c.getString(0);
 				int checksum = c.getInt(1);
 				if (!isInterrupted())
-					listener.foundResult(query, new ResultListener.Result(peer.getIpAddress(), file, checksum));
+					listener.foundResult(query, new ResultListener.Result(peer, file, checksum));
 				else
 				{
 					System.out.println("Search on "+peer.getIpAddress()+" was interrupted");
@@ -929,6 +984,6 @@ class SearchThread extends Thread {
 		}
 		
 		// Search finished
-		listener.searchComplete(query, peer.getIpAddress());
+		listener.searchComplete(query, peer);
 	}
 }
