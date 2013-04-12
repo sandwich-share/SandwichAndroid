@@ -13,11 +13,13 @@ import android.view.View;
 import android.view.View.OnFocusChangeListener;
 import android.view.Window;
 import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.ListView;
 import android.app.Activity;
+import android.content.Context;
 
 public class Search extends Activity implements TextView.OnEditorActionListener,OnFocusChangeListener {
 	private ClientThread client;
@@ -50,6 +52,19 @@ public class Search extends Activity implements TextView.OnEditorActionListener,
         
         // Call UI initialization code from the UI thread
         client.initialize();
+	}
+	
+	@Override
+	public boolean onSearchRequested() {
+		// Give focus to the search box
+		searchBox.requestFocus();
+		
+		// Display the keyboard
+		InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+		imm.showSoftInput(searchBox, InputMethodManager.SHOW_FORCED);
+		
+		// We don't want the dialog to actually come up
+		return false;
 	}
     
     @Override
@@ -124,7 +139,7 @@ public class Search extends Activity implements TextView.OnEditorActionListener,
 	@Override
 	public boolean onEditorAction(TextView view, int actionId, KeyEvent event) {
 		
-		if (actionId == EditorInfo.IME_ACTION_SEARCH) {
+		if (actionId == EditorInfo.IME_ACTION_SEARCH || event != null) {
 			String query = view.getText().toString();
 			System.out.println("Searching: "+query);
 			client.doSearch(query);
