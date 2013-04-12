@@ -67,6 +67,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		// Execute the asynchronous search with the client
 		try {
 			updateBar.setMax(sandwichClient.beginSearch(query, this));
+			System.out.println("Search started: "+updateBar.getMax());
 		} catch (Exception e) {
 			e.printStackTrace();
 			Dialog.displayDialog(activity, "Search Error", e.getMessage(), false);
@@ -82,9 +83,8 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		ResultAdapter listAdapter = (ResultAdapter)resultsView.getAdapter();
 		ResultListener.Result result;
 
-		// If we got cancelled, skip it
-		if (scheduledRun.get() == false)
-			return;
+		// Now running
+		scheduledRun.set(false);
 
 		// Add all results
 		for (;;) {
@@ -97,7 +97,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 		// If we've added too many results, terminate the search
 		if (listAdapter.getCount() > MAX_RESULTS)
 			sandwichClient.endSearch();
-			
+
 		// Update the progressbar
 		int capturedSearchesFinished = searchesFinished.get();
 		if (updateBar.getProgress() != capturedSearchesFinished)
@@ -108,9 +108,6 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 			if ((listAdapter.getCount() == 0) && (capturedSearchesFinished == updateBar.getMax()))
 				listAdapter.add(null);
 		}
-
-		// Run is finished
-		scheduledRun.set(false);
 	}
 
 	@Override
@@ -122,8 +119,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	public void searchComplete(String query, Peer peer) {
 		searchesFinished.incrementAndGet();
 		
-		if (scheduledRun.get() == false) {
-			scheduledRun.set(true);
+		if (scheduledRun.getAndSet(true) == false) {
 			activity.runOnUiThread(this);
 		}
 	}
@@ -132,8 +128,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	public void foundResult(String query, Result result) {
 		results.add(result);
 		
-		if (scheduledRun.get() == false) {
-			scheduledRun.set(true);
+		if (scheduledRun.getAndSet(true) == false) {
 			activity.runOnUiThread(this);
 		}
 	}

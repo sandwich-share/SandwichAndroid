@@ -47,9 +47,9 @@ public class ProgressUpdater implements IndexDownloadListener, Runnable {
 		if (resetInProgress) {
 			progressBar.setProgress(0);
 			resetInProgress = false;
+		} else {
+			progressBar.setSecondaryProgress((current / max) * progressBar.getMax());
 		}
-		progressBar.setMax(max);
-		progressBar.setSecondaryProgress(current);
 	}
 
 }
