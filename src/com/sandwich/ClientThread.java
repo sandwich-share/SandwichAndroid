@@ -15,6 +15,7 @@ import android.widget.ListView;
 import android.widget.ProgressBar;
 
 import com.sandwich.client.Client;
+import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.client.ResultListener;
 import com.sandwich.player.MediaMimeInfo;
 
@@ -45,7 +46,7 @@ public class ClientThread implements Runnable {
 	public void copyUrl(ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
 	{
 		String url = null;
-		Iterator<String> peers = result.getPeerIterator();
+		Iterator<Peer> peers = result.getPeerIterator();
 		
 		// This class was deprecated in API level 11, but we need compatibility for API level 9
 		ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
@@ -53,7 +54,7 @@ public class ClientThread implements Runnable {
 		while (peers.hasNext())
 		{
 			try {
-				 url = client.getUriForResult(peers.next(), result);
+				 url = Client.getUriForResult(peers.next(), result);
 				 break;
 			} catch (NoSuchAlgorithmException e) {
 				if (!peers.hasNext())
@@ -73,7 +74,7 @@ public class ClientThread implements Runnable {
 	
 	public void download(ResultListener.Result result) throws NoSuchAlgorithmException, URISyntaxException, IOException
 	{
-		Iterator<String> peers = result.getPeerIterator();
+		Iterator<Peer> peers = result.getPeerIterator();
 		
 		while (peers.hasNext())
 		{
@@ -95,7 +96,7 @@ public class ClientThread implements Runnable {
 	
 	public void stream(ResultListener.Result result) throws NoSuchAlgorithmException, URISyntaxException, IOException
 	{
-		Iterator<String> peers = result.getPeerIterator();
+		Iterator<Peer> peers = result.getPeerIterator();
 		
 		while (peers.hasNext())
 		{
@@ -119,12 +120,12 @@ public class ClientThread implements Runnable {
 	{
 		Intent shareIntent = new Intent();
 		String url = null;
-		Iterator<String> peers = result.getPeerIterator();
+		Iterator<Peer> peers = result.getPeerIterator();
 		
 		while (peers.hasNext())
 		{
 			try {
-				 url = client.getUriForResult(peers.next(), result);
+				 url = Client.getUriForResult(peers.next(), result);
 				 break;
 			} catch (NoSuchAlgorithmException e) {
 				if (!peers.hasNext())

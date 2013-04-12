@@ -5,6 +5,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.sandwich.client.Client;
+import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.client.ResultListener;
 
 import android.app.Activity;
@@ -118,7 +119,7 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	}
 
 	@Override
-	public void searchComplete(String query, String peer) {
+	public void searchComplete(String query, Peer peer) {
 		searchesFinished.incrementAndGet();
 		
 		if (scheduledRun.get() == false) {

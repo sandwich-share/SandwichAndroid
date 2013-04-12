@@ -10,7 +10,6 @@ import android.view.KeyEvent;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.View.OnFocusChangeListener;
 import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView.AdapterContextMenuInfo;
@@ -20,7 +19,7 @@ import android.widget.ListView;
 import android.app.Activity;
 import android.content.Context;
 
-public class Search extends Activity implements TextView.OnEditorActionListener,OnFocusChangeListener {
+public class Search extends Activity implements TextView.OnEditorActionListener {
 	private ClientThread client;
 	private Thread thread;
 	private ListView list;
@@ -43,7 +42,6 @@ public class Search extends Activity implements TextView.OnEditorActionListener,
 		// Setup search box
 		searchBox = (EditText) findViewById(R.id.searchBar);
 		searchBox.setOnEditorActionListener(this);
-		searchBox.setOnFocusChangeListener(this);
 
     	// Create the bootstrapper thread
         client = new ClientThread(this);
@@ -51,6 +49,13 @@ public class Search extends Activity implements TextView.OnEditorActionListener,
         
         // Call UI initialization code from the UI thread
         client.initialize();
+        
+        // Bootstrap it
+    	thread = new Thread(client);
+    	thread.start();
+    	
+    	// Begin search
+    	onSearchRequested();
 	}
 	
 	@Override
@@ -147,22 +152,19 @@ public class Search extends Activity implements TextView.OnEditorActionListener,
 		
 		if (event != null) {
 			String query = view.getText().toString();
+			
+	        // Start the bootstrapping process if it's not already running
+	    	if (thread == null || thread.getState() == Thread.State.TERMINATED)
+	    	{
+	    		System.out.println("Starting new bootstrap thread");
+	    		thread = new Thread(client);
+	    		thread.start();
+	    	}
+			
 			System.out.println("Searching: "+query);
 			client.doSearch(query);
 		}
 		
 		return false;
-	}
-
-	@Override
-	public void onFocusChange(View view, boolean hasFocus) {
-		if (hasFocus) {
-	        // Start the bootstrapping process if it's not already running
-	    	if (thread == null || thread.getState() == Thread.State.TERMINATED)
-	    	{
-	    		thread = new Thread(client);
-	    		thread.start();
-	    	}
-		}
 	}
 }

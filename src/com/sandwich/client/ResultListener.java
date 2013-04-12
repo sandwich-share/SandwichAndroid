@@ -4,19 +4,21 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
+import com.sandwich.client.PeerSet.Peer;
+
 public interface ResultListener {
 	public void foundResult(String query, Result result);
 	
-	public void searchComplete(String query, String peer);
+	public void searchComplete(String query, Peer peer);
 	
 	public class Result {
 		public String result;
-		public List<String> peers;
+		public List<Peer> peers;
 		public int checksum;
 		
-		public Result(String peer, String result, int checksum)
+		public Result(Peer peer, String result, int checksum)
 		{
-			this.peers = new ArrayList<String>();
+			this.peers = new ArrayList<Peer>();
 			this.result = result;
 			this.checksum = checksum;
 			
@@ -24,17 +26,17 @@ public interface ResultListener {
 			peers.add(peer);
 		}
 		
-		public void addPeer(String peer)
+		public void addPeer(Peer peer)
 		{
 			peers.add(peer);
 		}
 		
-		public void addPeers(List<String> peers)
+		public void addPeers(List<Peer> peers)
 		{
 			this.peers.addAll(peers);
 		}
 		
-		public Iterator<String> getPeerIterator()
+		public Iterator<Peer> getPeerIterator()
 		{
 			return peers.iterator();
 		}
