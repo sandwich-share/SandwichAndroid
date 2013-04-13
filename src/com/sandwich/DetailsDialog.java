@@ -6,6 +6,7 @@ import com.sandwich.client.Client;
 import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.client.ResultListener;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
@@ -44,6 +45,18 @@ public class DetailsDialog implements OnClickListener, Runnable {
 		dialog.dismiss();
 		dialogs.remove(dialog);
 	}
+	
+	@SuppressLint("DefaultLocale")
+	private static String humanReadableByteCount(long bytes) {
+	    if (bytes < 1024) {
+	    	return bytes + " bytes";
+	    }
+	    
+	    int exp = (int) (Math.log(bytes) / Math.log(1024));
+	    char prefix = "KMGTPE".charAt(exp-1);
+
+	    return String.format("%.2f %cB", bytes / Math.pow(1024, exp), prefix);
+	}
 
 	@Override
 	public void run() {
@@ -71,30 +84,9 @@ public class DetailsDialog implements OnClickListener, Runnable {
 	    	}
 	    	
 	    	// Create the size string
-	    	long size = result.size;
-	    	String units = "bytes";
-	    	if (size >= 1024)
-	    	{
-	    		size /= 1024;
-	    		units = "KB";
-	    		if (size >= 1024)
-	    		{
-	    			size /= 1024;
-	    			units = "MB";
-	    			if (size >= 1024)
-	    			{
-	    				size /= 1024;
-	    				units = "GB";
-	    				if (size >= 1024)
-	    				{
-	    					size /= 1024;
-	    					units = "TB";
-	    				}
-	    			}
-	    		}
-	    	}
+	    	String size = humanReadableByteCount(result.size);
 	    	
-	    	builder.setMessage("Peers: "+peerList+"\nSize: "+size+" "+units+"\nStreamable: "+streamable);
+	    	builder.setMessage("Peers: "+peerList+"\nSize: "+size+"\nStreamable: "+streamable);
 	    	
 	    	dialog = builder.create();
 			dialog.show();
