@@ -55,6 +55,7 @@ public class MediaMimeInfo {
 			mimeMapping.put("asf", "video/x-ms-asf");
 			mimeMapping.put("divx", "video/divx");
 			mimeMapping.put("mts", "video/avchd");
+			mimeMapping.put("mkv", "video/x-matroska");
 		}
 	}
 	
