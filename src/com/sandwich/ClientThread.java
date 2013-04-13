@@ -39,9 +39,9 @@ public class ClientThread implements Runnable {
 		listener.onQueryTextSubmit(query);
 	}
 	
-	public boolean isResultStreamable(ResultListener.Result result)
+	public static boolean isResultStreamable(ResultListener.Result result)
 	{
-		return client.isResultStreamable(result);
+		return Client.isResultStreamable(result);
 	}
 	
 	public void copyUrl(ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException

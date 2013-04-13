@@ -36,9 +36,10 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
-        public static final int action_settings=0x7f0a000e;
+        public static final int action_settings=0x7f0a000f;
         public static final int albumArt=0x7f0a0004;
         public static final int copy=0x7f0a000c;
+        public static final int details=0x7f0a000e;
         public static final int download=0x7f0a000a;
         public static final int playButton=0x7f0a0001;
         public static final int resultsListView=0x7f0a0005;
@@ -68,6 +69,7 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int action_settings=0x7f070005;
         public static final int app_name=0x7f070000;
         public static final int copy=0x7f070009;
+        public static final int details=0x7f07000a;
         public static final int download=0x7f070006;
         public static final int search_hint=0x7f070001;
         public static final int share=0x7f070008;

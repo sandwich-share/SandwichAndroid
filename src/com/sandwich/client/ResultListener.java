@@ -15,12 +15,14 @@ public interface ResultListener {
 		public String result;
 		public List<Peer> peers;
 		public int checksum;
+		public long size;
 		
-		public Result(Peer peer, String result, int checksum)
+		public Result(Peer peer, String result, long size, int checksum)
 		{
 			this.peers = new ArrayList<Peer>();
 			this.result = result;
 			this.checksum = checksum;
+			this.size = size;
 			
 			// We have just one peer now
 			peers.add(peer);
@@ -63,7 +65,11 @@ public interface ResultListener {
 				if (other.checksum != checksum)
 					return false;
 				
-				// Check the file name first
+				// Now try the size
+				if (other.size != size)
+					return false;
+				
+				// Finally the file name if all else fails
 				if (!other.result.equalsIgnoreCase(result))
 					return false;
 				

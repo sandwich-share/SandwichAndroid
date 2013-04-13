@@ -498,7 +498,7 @@ public class Client {
 		return getPeerUrlForFile(peer, result.result);
 	}
 	
-	public boolean isResultStreamable(ResultListener.Result result)
+	public static boolean isResultStreamable(ResultListener.Result result)
 	{
 		String mimeType;
 
@@ -766,7 +766,7 @@ class IndexDownloadThread extends Thread {
 			in = Client.getInputStreamFromConnection(conn);
 			
 			// Create the required table
-			peerindex.execSQL("CREATE TABLE IF NOT EXISTS "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY, Size INTEGER, Checksum INTEGER);");
+			peerindex.execSQL("CREATE TABLE IF NOT EXISTS "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY, Size INTEGER, CheckSum INTEGER);");
 			
 			// Compile the database insert so we don't have to do it each time
 			SQLiteStatement insertStmt = peerindex.compileStatement("INSERT OR REPLACE INTO "+Client.getTableNameForPeer(peer)+" VALUES (?1, ?2, ?3);");
@@ -823,10 +823,10 @@ class IndexDownloadThread extends Thread {
 								{
 									parser.nextToken();
 								}
-								
-								insertStmt.execute();
-								insertStmt.clearBindings();
 							}
+							
+							insertStmt.execute();
+							insertStmt.clearBindings();
 							
 							if (isInterrupted()) throw new InterruptedException();
 						}
@@ -908,7 +908,7 @@ class SearchThread extends Thread {
 	public void run() {
 		try {
 			Cursor c = peerindex.query(Client.getTableNameForPeer(peer),
-					new String[] {"FileName", "CheckSum"}, "FileName LIKE '%"+query+"%'",
+					new String[] {"FileName", "Size", "CheckSum"}, "FileName LIKE '%"+query+"%'",
 					null, null, null, null, ""+SearchListener.MAX_RESULTS);
 			
 			// Iterate the cursor
@@ -916,9 +916,10 @@ class SearchThread extends Thread {
 			while (!c.isAfterLast())
 			{
 				String file = c.getString(0);
-				int checksum = c.getInt(1);
+				long size = c.getLong(1);
+				int checksum = c.getInt(2);
 				if (!isInterrupted())
-					listener.foundResult(query, new ResultListener.Result(peer, file, checksum));
+					listener.foundResult(query, new ResultListener.Result(peer, file, size, checksum));
 				else
 				{
 					System.out.println("Search on "+peer.getIpAddress()+" was interrupted");

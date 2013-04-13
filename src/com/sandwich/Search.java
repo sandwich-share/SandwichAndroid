@@ -1,5 +1,6 @@
 package com.sandwich;
 
+import com.sandwich.client.Client;
 import com.sandwich.client.ResultListener;
 import com.sandwich.client.ResultListener.Result;
 
@@ -92,7 +93,7 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
         inflater.inflate(R.menu.context_menu, menu);
         
         // Remove the stream option if it's not streamable
-        if (!client.isResultStreamable(res)) {
+        if (!Client.isResultStreamable(res)) {
         	menu.removeItem(R.id.stream);
         }
     }
@@ -124,6 +125,13 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
         		Dialog.displayDialog(this, "URL Error", e.getMessage(), false);
         	}
         	return true;
+        case R.id.details:
+        	try {
+        		new DetailsDialog(this, result).createDetailsDialog();
+        	} catch (Exception e) {
+        		Dialog.displayDialog(this, "Error", e.getMessage(), false);
+        	}
+        	return true;
         case R.id.share:
         	try {
         		client.share(result);
@@ -143,6 +151,7 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
     	client.release();
     	Dialog.closeDialogs();
     	SpinnerDialog.closeDialogs();
+    	DetailsDialog.dismissDialogs();
     	
     	super.onDestroy();
     }

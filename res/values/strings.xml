@@ -12,5 +12,6 @@
     <string name="stream">Stream Media</string>
     <string name="share">Share URL</string>
     <string name="copy">Copy URL</string>
+    <string name="details">Details</string>
 
 </resources>
