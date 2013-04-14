@@ -13,9 +13,7 @@ public class MediaMimeInfo {
 	static {
 		// All lower case mime types and extensions
 		mimeMapping.put("m4a", "audio/mp4");
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-			mimeMapping.put("mka", "audio/x-matroska");
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1)
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH)
 			mimeMapping.put("aac", "audio/x-aac");
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1)
 			mimeMapping.put("flac", "audio/x-flac");
@@ -31,16 +29,6 @@ public class MediaMimeInfo {
 			mimeMapping.put("webm", "video/webm");
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
 			mimeMapping.put("ts", "video/mp2t");
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-			mimeMapping.put("avi", "video/avi");
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-			mimeMapping.put("f4v", "video/x-f4v");
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-			mimeMapping.put("flv", "video/x-flv");
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-			mimeMapping.put("mov", "video/quicktime");
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
-			mimeMapping.put("qt", "video/quicktime");
 	}
 	
 	public static void registerPackageManager(PackageManager pm)
@@ -50,12 +38,18 @@ public class MediaMimeInfo {
 		if (isTv)
 		{
 			mimeMapping.put("wma", "audio/x-ms-wma");
+			mimeMapping.put("mka", "audio/x-matroska");
 			
 			mimeMapping.put("wmv", "video/x-ms-wmv");
 			mimeMapping.put("asf", "video/x-ms-asf");
 			mimeMapping.put("divx", "video/divx");
 			mimeMapping.put("mts", "video/avchd");
 			mimeMapping.put("mkv", "video/x-matroska");
+			mimeMapping.put("mov", "video/quicktime");
+			mimeMapping.put("qt", "video/quicktime");
+			mimeMapping.put("avi", "video/avi");
+			mimeMapping.put("flv", "video/x-flv");
+			mimeMapping.put("f4v", "video/mp4");
 		}
 	}
 	
