@@ -17,5 +17,7 @@
     <string name="title_activity_settings">Settings</string>
     <string name="mobiledata">Use Mobile Data</string>
     <string name="initialnode">Initial Node:</string>
+    <string name="viewfiles">View File List</string>
+    <string name="blacklist">Blacklist Peer</string>
 
 </resources>

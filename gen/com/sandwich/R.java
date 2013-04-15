@@ -37,6 +37,7 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
     }
     public static final class id {
         public static final int albumArt=0x7f0a0004;
+        public static final int blacklist=0x7f0a0015;
         public static final int bnodeLabel=0x7f0a000a;
         public static final int bootstrapText=0x7f0a000b;
         public static final int copy=0x7f0a0011;
@@ -56,6 +57,7 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int timeView=0x7f0a0002;
         public static final int updateBar=0x7f0a0008;
         public static final int videoView=0x7f0a000d;
+        public static final int viewfiles=0x7f0a0014;
     }
     public static final class layout {
         public static final int activity_audio_player=0x7f030000;
@@ -80,6 +82,7 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
     public static final class string {
         public static final int action_settings=0x7f070005;
         public static final int app_name=0x7f070000;
+        public static final int blacklist=0x7f070011;
         public static final int copy=0x7f070009;
         public static final int details=0x7f07000a;
         public static final int download=0x7f070006;
@@ -94,6 +97,7 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int title_activity_search=0x7f070004;
         public static final int title_activity_settings=0x7f07000d;
         public static final int title_activity_video_player=0x7f070002;
+        public static final int viewfiles=0x7f070010;
     }
     public static final class style {
         /** 

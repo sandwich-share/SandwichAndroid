@@ -27,11 +27,13 @@ public class ClientThread implements Runnable {
 	private Client client;
 	private boolean loadedCache;
 	private Thread thread;
+	public Blacklist blacklist;
 	
 	public ClientThread(Activity mainActivity, Context appContext)
 	{
 		this.mainActivity = mainActivity;
 		this.appContext = appContext;
+		this.blacklist = new Blacklist(appContext);
 	}
 	
 	public void bootstrap()
@@ -193,6 +195,9 @@ public class ClientThread implements Runnable {
     	client = new Client(appContext);
     	client.initialize();
     	
+    	// Initialize the blacklist
+    	blacklist.initialize();
+    	
     	// Register our package manager with the MIME class
     	MediaMimeInfo.registerPackageManager(appContext.getPackageManager());
 	}
@@ -222,7 +227,9 @@ public class ClientThread implements Runnable {
 			{
 				searchActivity.updater.reset();
 			}
-			int max = client.bootstrapFromNetwork(Settings.getBootstrapNode(appContext), searchActivity != null ? searchActivity.updater : null);
+			int max = client.bootstrapFromNetwork(Settings.getBootstrapNode(appContext),
+					searchActivity != null ? searchActivity.updater : null,
+					blacklist.getBlacklistSet());
 			if (searchActivity != null)
 			{
 				searchActivity.updater.updateMax(max);

@@ -562,7 +562,7 @@ public class Client {
 		}
 	}
 	
-	public int bootstrapFromNetwork(String initialPeer, IndexDownloadListener listener) throws IOException, JSONException, InterruptedException, NoSuchAlgorithmException, URISyntaxException
+	public int bootstrapFromNetwork(String initialPeer, IndexDownloadListener listener, Set<String> blacklist) throws IOException, JSONException, InterruptedException, NoSuchAlgorithmException, URISyntaxException
 	{
 		Iterator<PeerSet.Peer> iterator;
 		int threads = 0;
@@ -601,6 +601,31 @@ public class Client {
 					// Check if an updater is already running for this peer
 					if (!indexDownloadThreads.containsKey(peer))
 					{
+						// Check if the peer is blacklisted
+						if (blacklist.contains(peer.getIpAddress()))
+						{
+							System.out.println(peer.getIpAddress()+" is blacklisted");
+							
+							// Index is going away
+							peer.updateIndexHash(0);
+							
+							// Create an empty table for them
+							getPeerDatabase(peer).execSQL("DROP TABLE IF EXISTS "+Client.getTableNameForPeer(peer)+";");
+							getPeerDatabase(peer).execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY, Size INTEGER, CheckSum INTEGER);");
+							
+							// Create the values to be stored in the SQL database
+							ContentValues vals = new ContentValues();
+							vals.put("IP", peer.getIpAddress());
+							vals.put("IndexHash", peer.getIndexHash());
+							vals.put("LastSeen", peer.getTimestamp());
+
+							// Update the peer entry in the database
+							database.insertWithOnConflict(Client.PEER_TABLE, null, vals, SQLiteDatabase.CONFLICT_REPLACE);
+							
+							// Don't download anything
+							continue;
+						}
+						
 						// Check if the old index hash is valid
 						oldHash = getOldHashOfPeerIndex(peer);
 						if (oldHash == peer.getIndexHash())

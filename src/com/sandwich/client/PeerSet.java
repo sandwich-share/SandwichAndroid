@@ -80,6 +80,7 @@ public class PeerSet {
 		private long indexHash;
 		private PeerSet peerSet;
 		private String timestamp;
+		private boolean blacklisted;
 		
 		public Peer(String ip, String timestamp, long indexHash)
 		{
@@ -87,6 +88,7 @@ public class PeerSet {
 			this.indexHash = indexHash;
 			this.peerSet = null;
 			this.timestamp = timestamp;
+			this.blacklisted = false;
 		}
 		
 		public Peer(Peer p)
@@ -94,6 +96,8 @@ public class PeerSet {
 			this.ip = p.ip;
 			this.indexHash = p.indexHash;
 			this.peerSet = null;
+			this.timestamp = p.timestamp;
+			this.blacklisted = p.blacklisted;
 		}
 		
 		private void setPeerSet(PeerSet peerSet)
@@ -134,6 +138,11 @@ public class PeerSet {
 			indexHash = newHash;
 		}
 		
+		public void setBlacklisted(boolean blacklisted)
+		{
+			this.blacklisted = blacklisted;
+		}
+		
 		@Override
 		public boolean equals(Object o)
 		{
@@ -156,7 +165,13 @@ public class PeerSet {
 		@Override
 		public String toString()
 		{
-			return getIpAddress();
+			String str = getIpAddress();
+			
+			if (blacklisted) {
+				str += " (Blacklisted)";
+			}
+			
+			return str;
 		}
 	}
 }
