@@ -1066,10 +1066,7 @@ class SearchThread extends Thread {
 					if (!interrupt.get())
 						listener.foundResult(query, new ResultListener.Result(peer, file, size, checksum));
 					else
-					{
-						System.out.println("Search on "+peer.getIpAddress()+" was interrupted");
-						break;
-					}
+						throw new InterruptedException();
 				}
 				
 				// Grab the row count
@@ -1090,6 +1087,8 @@ class SearchThread extends Thread {
 			
 			// Drop them from the database
 			client.deletePeerFromDatabase(peer);
+		} catch (InterruptedException e) {
+			System.out.println("Search on "+peer.getIpAddress()+" was interrupted");
 		}
 		
 		// Search finished
