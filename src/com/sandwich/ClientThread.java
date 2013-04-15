@@ -183,6 +183,10 @@ public class ClientThread implements Runnable {
 		client.endSearch();
 	}
 	
+	public void endBootstrap() {
+		client.endBootstrap();
+	}
+	
 	public void initialize()
 	{
     	if (client != null)

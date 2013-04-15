@@ -63,13 +63,6 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
 	}
 	
 	@Override
-	protected void onPause() {
-		// End search before entering background
-		client.endSearch();
-		super.onPause();
-	}
-	
-	@Override
 	public boolean onSearchRequested() {
 		// Bootstrap
 		client.bootstrap();

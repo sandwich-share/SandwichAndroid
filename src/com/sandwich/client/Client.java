@@ -23,6 +23,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -55,6 +56,7 @@ public class Client {
 	private Context context;
 	PeerSet peers;
 	
+	private AtomicBoolean killSearch, killDownload;
 	private ArrayList<Thread> searchThreads;
 	private HashMap<PeerSet.Peer, Thread> indexDownloadThreads;
 	
@@ -73,6 +75,8 @@ public class Client {
 		this.indexDownloadThreads = new HashMap<PeerSet.Peer, Thread>();
 		this.peerDatabases = new HashMap<PeerSet.Peer, SQLiteDatabase>();
 		this.peers = new PeerSet();
+		this.killSearch = new AtomicBoolean();
+		this.killDownload = new AtomicBoolean();
 	}
 	
 	// Holy fucking shit
@@ -289,13 +293,6 @@ public class Client {
 		return peerSet;
 	}
 	
-	private Thread startDownloadIndexThreadForPeer(PeerSet.Peer peer, IndexDownloadListener listener)
-	{
-		Thread t = new IndexDownloadThread(this, getPeerDatabase(peer), peer, listener);
-		t.start();
-		return t;
-	}
-	
 	private PeerSet getPeerSetFromDatabase(SQLiteDatabase database) throws SQLiteException
 	{
 		PeerSet peers = new PeerSet();
@@ -383,19 +380,17 @@ public class Client {
 	
 	public void release()
 	{
-		// Start killing of search threads
+		// Kill search threads
 		endSearch();
 		
-		try {
-			// Stop bootstrapping
-			stopBootstrap();
-			
-			// Wait for the search threads to die
-			for (Thread t : searchThreads)
-			{
-				t.join();
-			}
-		} catch (InterruptedException e) { }
+		// Kill bootstrap threads
+		endBootstrap();
+		
+		// Wait for search to finish
+		waitForSearch();
+		
+		// Wait for bootstrap to finish
+		waitForBootstrap();
 		
 		// Close all the peer databases
 		synchronized (peerDatabases) {
@@ -519,21 +514,26 @@ public class Client {
 		throw new IllegalStateException("No peers online");
 	}
 	
-	public void stopBootstrap() throws InterruptedException
+	public void waitForBootstrap()
 	{
 		synchronized (indexDownloadThreads) {
-			// Interrupt threads
-			for (Thread t : indexDownloadThreads.values())
-			{
-				t.interrupt();
-			}
-			
 			// Wait for them to die
 			for (Thread t : indexDownloadThreads.values())
 			{
-				t.join();
+				try {
+					t.join();
+				} catch (InterruptedException e) {}
 			}
+			
+			// Everyone's dead
+			indexDownloadThreads.clear();
 		}
+	}
+	
+	public void endBootstrap()
+	{
+		// Start the killing
+		killDownload.set(true);
 	}
 	
 	public static String getUriForResult(Peer peer, ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
@@ -575,6 +575,9 @@ public class Client {
 
 		// Download the peer list
 		downloadPeerList(initialPeer);
+		
+		// Stop killing downloads
+		killDownload.set(false);
 		
 		// Reap threads that aren't still downloading
 		ArrayList<PeerSet.Peer> reapList = new ArrayList<PeerSet.Peer>();
@@ -643,7 +646,9 @@ public class Client {
 						}
 						
 						// No updater running and index is not up to date
-						indexDownloadThreads.put(peer, startDownloadIndexThreadForPeer(peer, listener));
+						Thread t = new IndexDownloadThread(this, getPeerDatabase(peer), peer, listener, killDownload);
+						indexDownloadThreads.put(peer, t);
+						t.start();
 						threads++;
 					}
 				}
@@ -653,23 +658,25 @@ public class Client {
 		return threads;
 	}
 	
-	public void endSearch()
+	public void waitForSearch()
 	{
-		ArrayList<Thread> reapList = new ArrayList<Thread>();
-
-		synchronized (searchThreads) {	
+		synchronized (searchThreads) {
 			// Interrupt existing search threads
-			for (Thread t : searchThreads)
-			{
-				if (t.getState() == Thread.State.TERMINATED)
-					reapList.add(t);
-				else
-					t.interrupt();
+			for (Thread t : searchThreads) {
+				try {
+					t.join();
+				} catch (InterruptedException e) {}
 			}
 			
-			// Reap dead threads
-			searchThreads.removeAll(reapList);
+			// Everyone's dead
+			searchThreads.clear();
 		}
+	}
+	
+	public void endSearch()
+	{
+		// Start the killing
+		killSearch.set(true);
 	}
 	
 	public int getPeerCount()
@@ -684,6 +691,9 @@ public class Client {
 			throw new IllegalStateException("Not bootstrapped");
 		}
 		
+		// Stop killing searches
+		killSearch.set(false);
+		
 		// Make sure the peer list isn't modified by the search threads while we're iterating
 		synchronized (peers) {
 			// Start search threads for each peer
@@ -697,7 +707,7 @@ public class Client {
 				{
 					// Start the search thread
 					System.out.println("Spawning thread to search "+peer.getIpAddress());
-					Thread t = new SearchThread(this, getPeerDatabase(peer), peer, listener, null);
+					Thread t = new SearchThread(this, getPeerDatabase(peer), peer, listener, null, killSearch);
 					synchronized (searchThreads) {
 						searchThreads.add(t);
 					}
@@ -719,6 +729,9 @@ public class Client {
 			throw new IllegalStateException("Not bootstrapped");
 		}
 		
+		// Stop killing searches
+		killSearch.set(false);
+		
 		// Make sure the peer list isn't modified by the search threads while we're iterating
 		synchronized (peers) {
 			// Start search threads for each peer
@@ -729,7 +742,7 @@ public class Client {
 
 				// Start the search thread
 				System.out.println("Spawning thread to search "+peer.getIpAddress());
-				Thread t = new SearchThread(this, getPeerDatabase(peer), peer, listener, query);
+				Thread t = new SearchThread(this, getPeerDatabase(peer), peer, listener, query, killSearch);
 				synchronized (searchThreads) {
 					searchThreads.add(t);
 				}
@@ -839,13 +852,15 @@ class IndexDownloadThread extends Thread {
 	PeerSet.Peer peer;
 	Client client;
 	IndexDownloadListener listener;
+	AtomicBoolean interrupt;
 	
-	public IndexDownloadThread(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, IndexDownloadListener listener)
+	public IndexDownloadThread(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, IndexDownloadListener listener, AtomicBoolean interrupt)
 	{
 		this.client = client;
 		this.peerindex = peerindex;
 		this.peer = peer;
 		this.listener = listener;
+		this.interrupt = interrupt;
 	}
 
 	@Override
@@ -937,7 +952,9 @@ class IndexDownloadThread extends Thread {
 							
 							insertStmt.execute();
 							
-							if (isInterrupted()) throw new InterruptedException();
+							if (interrupt.get()) {
+								throw new InterruptedException();
+							}
 						}
 					}
 					else
@@ -1008,16 +1025,18 @@ class SearchThread extends Thread {
 	String query;
 	ResultListener listener;
 	Client client;
+	AtomicBoolean interrupt;
 	
 	private static final int LIMIT_PER_QUERY = 10000;
 	
-	public SearchThread(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, ResultListener listener, String query)
+	public SearchThread(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, ResultListener listener, String query, AtomicBoolean interrupt)
 	{
 		this.client = client;
 		this.peerindex = peerindex;
 		this.peer = peer;
 		this.query = query;
 		this.listener = listener;
+		this.interrupt = interrupt;
 	}
 
 	@Override
@@ -1044,7 +1063,7 @@ class SearchThread extends Thread {
 					String file = c.getString(0);
 					long size = c.getLong(1);
 					int checksum = c.getInt(2);
-					if (!isInterrupted())
+					if (!interrupt.get())
 						listener.foundResult(query, new ResultListener.Result(peer, file, size, checksum));
 					else
 					{

@@ -69,6 +69,25 @@ public class TabView extends TabActivity implements OnTabChangeListener {
 	}
 	
 	@Override
+	protected void onResume() {
+		super.onResume();
+		
+		// Bootstrap again
+		client.bootstrap();
+	}
+	
+	@Override
+	protected void onPause() {
+		// End bootstrap before entering background
+		client.endBootstrap();
+		
+		// End search before entering background
+		client.endSearch();
+		
+		super.onPause();
+	}
+	
+	@Override
 	public void onDestroy() {
     	client.release();
     	
