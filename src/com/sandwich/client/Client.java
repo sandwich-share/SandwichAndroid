@@ -31,7 +31,7 @@ import org.json.JSONObject;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
-import com.sandwich.SearchListener;
+import com.sandwich.Settings;
 import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.player.MediaMimeInfo;
 
@@ -94,6 +94,27 @@ public class Client {
 		}
 		
 		return peers;
+	}
+	
+	private void checkNetworkOK()
+	{
+		ConnectivityManager mgr = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+		NetworkInfo active = mgr.getActiveNetworkInfo();
+		
+		if (active != null)
+		{
+			// Everything but these types are "mobile data"
+			if (active.getType() != ConnectivityManager.TYPE_WIFI &&
+				active.getType() != ConnectivityManager.TYPE_BLUETOOTH &&
+				active.getType() != ConnectivityManager.TYPE_ETHERNET)
+			{
+				// If mobile data is disabled, don't let them continue
+				if (!Settings.isMobileDataEnabled(context))
+				{
+					throw new IllegalStateException("Mobile data disabled");
+				}
+			}
+		}
 	}
 	
 	private boolean isNetworkActive()
@@ -416,6 +437,8 @@ public class Client {
 		Iterator<PeerSet.Peer> iterator;
 		Random rand = new Random();
 		
+		checkNetworkOK();
+		
 		System.out.println("Downloading the peer list");
 		
 		// Bootstrap from a random peer
@@ -709,6 +732,11 @@ public class Client {
 		// Download to the external downloads folder
 		request.setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, title);
 		
+		// Force download over WiFi if mobile data is disabled
+		if (!Settings.isMobileDataEnabled(context)) {
+			request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI);
+		}
+		
 		// DownloadManager was enhanced with Honeycomb with useful features we want to activate
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB)
 		{
@@ -739,6 +767,8 @@ public class Client {
 	{
 		String url;
 		String mimeType;
+		
+		checkNetworkOK();
 
 		mimeType = MediaMimeInfo.getMimeTypeForPath(file);
 		url = getPeerUrlForFile(peer, file);
@@ -931,8 +961,10 @@ class IndexDownloadThread extends Thread {
 			if (conn != null)
 				conn.disconnect();
 			
-			// Notify the listener
-			listener.indexDownloadComplete(peer.getIpAddress());
+			if (listener != null) {
+				// Notify the listener
+				listener.indexDownloadComplete(peer.getIpAddress());
+			}
 		}
 	}
 }
@@ -959,7 +991,7 @@ class SearchThread extends Thread {
 			Cursor c = peerindex.query(Client.getTableNameForPeer(peer),
 					new String[] {"FileName", "Size", "CheckSum"},
 					query != null ? "FileName LIKE '%"+query+"%'" : null,
-					null, null, null, null, ""+SearchListener.MAX_RESULTS);
+					null, null, null, null, null);
 			
 			// Iterate the cursor
 			c.moveToFirst();

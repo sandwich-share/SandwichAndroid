@@ -48,8 +48,6 @@ public class ClientThread implements Runnable {
 	public void registerSearchActivity(Search searchActivity)
 	{        
 		this.searchActivity = searchActivity;
-		
-		
 	}
 	
 	public SearchListener getSearchListener(Activity activity)
@@ -219,14 +217,12 @@ public class ClientThread implements Runnable {
         }
 		
 		try {
-			String initialHost = "isys-ubuntu.case.edu";
-
 			// Bootstrap from network
 			if (searchActivity != null)
 			{
 				searchActivity.updater.reset();
 			}
-			int max = client.bootstrapFromNetwork(initialHost, null);
+			int max = client.bootstrapFromNetwork(Settings.getBootstrapNode(appContext), searchActivity != null ? searchActivity.updater : null);
 			if (searchActivity != null)
 			{
 				searchActivity.updater.updateMax(max);

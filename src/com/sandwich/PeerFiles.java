@@ -49,13 +49,13 @@ public class PeerFiles extends Activity implements ResultListener, Runnable, OnI
 		filesView.setOnItemClickListener(this);
 		registerForContextMenu(filesView);
 
+		client.endSearch();
 		client.getPeerIndex(peer, this);
 	}
 	
 	@Override
 	protected void onDestroy() {
-		
-		
+		client.endSearch();
 		super.onDestroy();
 	}
 

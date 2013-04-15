@@ -73,8 +73,9 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int media_player=0x7f090002;
         public static final int peer_files=0x7f090003;
         public static final int peer_list=0x7f090004;
-        public static final int search=0x7f090005;
-        public static final int settings=0x7f090006;
+        public static final int peer_menu=0x7f090005;
+        public static final int search=0x7f090006;
+        public static final int settings=0x7f090007;
     }
     public static final class string {
         public static final int action_settings=0x7f070005;
