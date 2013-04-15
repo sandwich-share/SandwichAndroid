@@ -101,6 +101,11 @@ public class Client {
 		ConnectivityManager mgr = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
 		NetworkInfo active = mgr.getActiveNetworkInfo();
 		
+		if (!isNetworkActive())
+		{
+			throw new IllegalStateException("No network connection");
+		}
+		
 		if (active != null)
 		{
 			// Everything but these types are "mobile data"

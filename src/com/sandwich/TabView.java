@@ -25,7 +25,7 @@ public class TabView extends TabActivity implements OnTabChangeListener {
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		// Setup the global client object and register it with each activity
-		client = new ClientThread(this, getApplicationContext());
+		client = new ClientThread(getApplicationContext());
         client.initialize();
 		Search.addClient(client);
 		PeerList.addClient(client);
