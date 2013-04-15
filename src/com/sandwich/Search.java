@@ -17,7 +17,6 @@ import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.EditText;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.ListView;
 import android.app.Activity;
@@ -27,7 +26,6 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
 	private static ClientThread client;
 	private ListView list;
 	private EditText searchBox;
-	ProgressUpdater updater;
 	SearchListener listener;
 
 	public static void addClient(ClientThread t) {
@@ -43,10 +41,6 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
 		
 		// Set the layout
 		setContentView(R.layout.activity_search);
-        
-    	// Create the progress bar updater
-        ProgressBar progress = (ProgressBar)findViewById(R.id.updateBar);
-    	updater = new ProgressUpdater(this, progress);
     	
     	// Get the search listener
     	listener = client.getSearchListener(this);

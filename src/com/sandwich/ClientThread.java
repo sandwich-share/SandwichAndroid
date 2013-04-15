@@ -219,18 +219,8 @@ public class ClientThread implements Runnable {
         }
 		
 		try {
-			// Bootstrap from network
-			if (searchActivity != null)
-			{
-				searchActivity.updater.reset();
-			}
-			int max = client.bootstrapFromNetwork(Settings.getBootstrapNode(appContext),
-					searchActivity != null ? searchActivity.updater : null,
-					blacklist.getBlacklistSet());
-			if (searchActivity != null)
-			{
-				searchActivity.updater.updateMax(max);
-			}
+			client.bootstrapFromNetwork(Settings.getBootstrapNode(appContext),
+					null, blacklist.getBlacklistSet());
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
