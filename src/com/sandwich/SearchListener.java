@@ -7,6 +7,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import com.sandwich.client.Client;
 import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.client.ResultListener;
+import com.sandwich.ui.Dialog;
 
 import android.app.Activity;
 import android.view.View;

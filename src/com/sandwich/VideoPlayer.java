@@ -3,6 +3,7 @@ package com.sandwich;
 
 import com.sandwich.R;
 import com.sandwich.player.SandwichPlayer;
+import com.sandwich.ui.Dialog;
 
 import android.net.Uri;
 import android.os.Bundle;

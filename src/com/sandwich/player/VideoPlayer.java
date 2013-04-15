@@ -1,8 +1,8 @@
 package com.sandwich.player;
 
-import com.sandwich.Dialog;
 import com.sandwich.R;
-import com.sandwich.SpinnerDialog;
+import com.sandwich.ui.Dialog;
+import com.sandwich.ui.SpinnerDialog;
 
 import android.app.Activity;
 import android.media.MediaPlayer;

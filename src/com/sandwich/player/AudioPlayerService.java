@@ -3,9 +3,9 @@ package com.sandwich.player;
 import java.io.IOException;
 import java.util.HashMap;
 
-import com.sandwich.Dialog;
 import com.sandwich.R;
-import com.sandwich.SpinnerDialog;
+import com.sandwich.ui.Dialog;
+import com.sandwich.ui.SpinnerDialog;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;

@@ -3,6 +3,9 @@ package com.sandwich;
 import com.sandwich.client.Client;
 import com.sandwich.client.ResultListener;
 import com.sandwich.client.ResultListener.Result;
+import com.sandwich.ui.DetailsDialog;
+import com.sandwich.ui.Dialog;
+import com.sandwich.ui.SpinnerDialog;
 
 import android.os.Bundle;
 import android.view.ContextMenu;

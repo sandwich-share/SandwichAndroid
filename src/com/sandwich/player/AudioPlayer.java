@@ -2,7 +2,7 @@ package com.sandwich.player;
 
 import java.io.IOException;
 
-import com.sandwich.Dialog;
+import com.sandwich.ui.Dialog;
 
 import android.app.Activity;
 import android.app.Service;

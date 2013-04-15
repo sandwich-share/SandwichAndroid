@@ -1,4 +1,4 @@
-package com.sandwich;
+package com.sandwich.ui;
 
 import java.util.ArrayList;
 

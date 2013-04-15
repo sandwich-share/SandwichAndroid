@@ -18,6 +18,7 @@ import com.sandwich.client.Client;
 import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.client.ResultListener;
 import com.sandwich.player.MediaMimeInfo;
+import com.sandwich.ui.Dialog;
 
 @SuppressWarnings("deprecation") // Needed to avoid stupid warnings for older ClipboardManager class
 public class ClientThread implements Runnable {
