@@ -42,6 +42,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
+import android.database.sqlite.SQLiteDoneException;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteStatement;
 import android.net.ConnectivityManager;
@@ -616,7 +617,7 @@ public class Client {
 							
 							// Create an empty table for them
 							getPeerDatabase(peer).execSQL("DROP TABLE IF EXISTS "+Client.getTableNameForPeer(peer)+";");
-							getPeerDatabase(peer).execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY, Size INTEGER, CheckSum INTEGER);");
+							getPeerDatabase(peer).execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY COLLATE NOCASE, Size INTEGER, CheckSum INTEGER);");
 							
 							// Create the values to be stored in the SQL database
 							ContentValues vals = new ContentValues();
@@ -875,7 +876,7 @@ class IndexDownloadThread extends Thread {
 			in = Client.getInputStreamFromConnection(conn);
 			
 			// Create the required table
-			peerindex.execSQL("CREATE TABLE IF NOT EXISTS "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY, Size INTEGER, CheckSum INTEGER);");
+			peerindex.execSQL("CREATE TABLE IF NOT EXISTS "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY COLLATE NOCASE, Size INTEGER, CheckSum INTEGER);");
 			
 			// Compile the database insert so we don't have to do it each time
 			SQLiteStatement insertStmt = peerindex.compileStatement("INSERT OR REPLACE INTO "+Client.getTableNameForPeer(peer)+" VALUES (?1, ?2, ?3);");
@@ -884,8 +885,8 @@ class IndexDownloadThread extends Thread {
 			JsonFactory jfactory = new JsonFactory();
 			JsonParser parser = jfactory.createJsonParser(new BufferedInputStream(in));
 			
-			// Begin immediate transaction
-			peerindex.execSQL("BEGIN IMMEDIATE TRANSACTION");
+			// Begin transaction
+			peerindex.execSQL("BEGIN TRANSACTION");
 			try {
 				// Parse the index object
 				parser.nextToken();
@@ -935,7 +936,6 @@ class IndexDownloadThread extends Thread {
 							}
 							
 							insertStmt.execute();
-							insertStmt.clearBindings();
 							
 							if (isInterrupted()) throw new InterruptedException();
 						}
@@ -948,6 +948,9 @@ class IndexDownloadThread extends Thread {
 			} finally {
 				// Commit transaction
 				peerindex.execSQL("END TRANSACTION");
+				
+				// Index this table's file names
+				peerindex.execSQL("CREATE UNIQUE INDEX file_index ON "+Client.getTableNameForPeer(peer)+" (FileName)");
 				
 				// Delete the precompiled statement
 				insertStmt.close();
@@ -1006,6 +1009,8 @@ class SearchThread extends Thread {
 	ResultListener listener;
 	Client client;
 	
+	private static final int LIMIT_PER_QUERY = 10000;
+	
 	public SearchThread(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, ResultListener listener, String query)
 	{
 		this.client = client;
@@ -1018,28 +1023,46 @@ class SearchThread extends Thread {
 	@Override
 	public void run() {
 		try {
-			Cursor c = peerindex.query(Client.getTableNameForPeer(peer),
-					new String[] {"FileName", "Size", "CheckSum"},
-					query != null ? "FileName LIKE '%"+query+"%'" : null,
-					null, null, null, null, null);
-			
-			// Iterate the cursor
-			c.moveToFirst();
-			while (!c.isAfterLast())
+			int offset = 0, count;
+			do
 			{
-				String file = c.getString(0);
-				long size = c.getLong(1);
-				int checksum = c.getInt(2);
-				if (!isInterrupted())
-					listener.foundResult(query, new ResultListener.Result(peer, file, size, checksum));
-				else
-				{
-					System.out.println("Search on "+peer.getIpAddress()+" was interrupted");
+				Cursor c;
+				try {
+					// Execute the query
+					c = peerindex.query(Client.getTableNameForPeer(peer),
+							new String[] {"FileName", "Size", "CheckSum"},
+							query != null ? "FileName LIKE '%"+query+"%'" : null,
+							null, null, null, null, offset+", "+LIMIT_PER_QUERY);
+				} catch (SQLiteDoneException e) {
+					// No more entries
 					break;
 				}
-				c.moveToNext();
+				
+				// Iterate the cursor
+				while (c.moveToNext())
+				{
+					String file = c.getString(0);
+					long size = c.getLong(1);
+					int checksum = c.getInt(2);
+					if (!isInterrupted())
+						listener.foundResult(query, new ResultListener.Result(peer, file, size, checksum));
+					else
+					{
+						System.out.println("Search on "+peer.getIpAddress()+" was interrupted");
+						break;
+					}
+				}
+				
+				// Grab the row count
+				count = c.getCount();
+				
+				// Close this cursor
+				c.close();
+				
+				// Increment the offset
+				offset += count;
 			}
-			c.close();
+			while (count == LIMIT_PER_QUERY);
 		} catch (SQLiteException e) {
 			System.err.println("Failed to search index for peer: "+peer.getIpAddress());
 			

@@ -26,8 +26,6 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 	private ConcurrentLinkedQueue<ResultListener.Result> results;
 	private AtomicInteger searchesFinished;
 	private AtomicBoolean scheduledRun;
-
-	public static final int MAX_RESULTS = 10000;
 		
 	public SearchListener(Activity activity, Client client)
 	{
@@ -93,10 +91,6 @@ public class SearchListener implements ResultListener,OnItemClickListener,Runnab
 				break;
 			listAdapter.add(result);
 		}
-
-		// If we've added too many results, terminate the search
-		if (listAdapter.getCount() > MAX_RESULTS)
-			sandwichClient.endSearch();
 
 		// Update the progressbar
 		int capturedSearchesFinished = searchesFinished.get();
