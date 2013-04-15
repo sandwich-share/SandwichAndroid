@@ -146,7 +146,7 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
         	return true;
         case R.id.share:
         	try {
-        		client.share(result);
+        		client.share(this, result);
         	} catch (Exception e) {
         		Dialog.displayDialog(this, "Sharing Error", e.getMessage(), false);
         	}

@@ -152,7 +152,7 @@ public class ClientThread implements Runnable {
 		}
 	}
 	
-	public void share(ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
+	public void share(Activity activity, ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
 	{
 		Intent shareIntent = new Intent();
 		String url = null;
@@ -179,7 +179,7 @@ public class ClientThread implements Runnable {
 		shareIntent.putExtra(Intent.EXTRA_TEXT, url);
 		shareIntent.setType("text/plain");
 
-		appContext.startActivity(Intent.createChooser(shareIntent, "Share to..."));
+		activity.startActivity(Intent.createChooser(shareIntent, "Share to..."));
 	}
 	
 	public void endSearch() {

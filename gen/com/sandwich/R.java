@@ -36,7 +36,6 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
-        public static final int action_settings=0x7f0a0014;
         public static final int albumArt=0x7f0a0004;
         public static final int bnodeLabel=0x7f0a000a;
         public static final int bootstrapText=0x7f0a000b;
