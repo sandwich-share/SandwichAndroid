@@ -36,34 +36,46 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int ic_launcher=0x7f020000;
     }
     public static final class id {
-        public static final int action_settings=0x7f0a000f;
+        public static final int action_settings=0x7f0a0014;
         public static final int albumArt=0x7f0a0004;
-        public static final int copy=0x7f0a000c;
-        public static final int details=0x7f0a000e;
-        public static final int download=0x7f0a000a;
+        public static final int bnodeLabel=0x7f0a000a;
+        public static final int bootstrapText=0x7f0a000b;
+        public static final int copy=0x7f0a0011;
+        public static final int details=0x7f0a0013;
+        public static final int download=0x7f0a000f;
+        public static final int mobileDataBox=0x7f0a000c;
+        public static final int peerFilesView=0x7f0a0005;
+        public static final int peersListView=0x7f0a0006;
         public static final int playButton=0x7f0a0001;
-        public static final int resultsListView=0x7f0a0005;
-        public static final int rowTextView=0x7f0a0009;
-        public static final int searchBar=0x7f0a0007;
+        public static final int resultsListView=0x7f0a0007;
+        public static final int rowTextView=0x7f0a000e;
+        public static final int searchBar=0x7f0a0009;
         public static final int seekBar=0x7f0a0000;
-        public static final int share=0x7f0a000d;
+        public static final int share=0x7f0a0012;
         public static final int songText=0x7f0a0003;
-        public static final int stream=0x7f0a000b;
+        public static final int stream=0x7f0a0010;
         public static final int timeView=0x7f0a0002;
-        public static final int updateBar=0x7f0a0006;
-        public static final int videoView=0x7f0a0008;
+        public static final int updateBar=0x7f0a0008;
+        public static final int videoView=0x7f0a000d;
     }
     public static final class layout {
         public static final int activity_audio_player=0x7f030000;
-        public static final int activity_search=0x7f030001;
-        public static final int activity_video_player=0x7f030002;
-        public static final int simplerow=0x7f030003;
+        public static final int activity_peer_files=0x7f030001;
+        public static final int activity_peer_list=0x7f030002;
+        public static final int activity_search=0x7f030003;
+        public static final int activity_settings=0x7f030004;
+        public static final int activity_tabs=0x7f030005;
+        public static final int activity_video_player=0x7f030006;
+        public static final int simplerow=0x7f030007;
     }
     public static final class menu {
         public static final int audio_player=0x7f090000;
         public static final int context_menu=0x7f090001;
         public static final int media_player=0x7f090002;
-        public static final int search=0x7f090003;
+        public static final int peer_files=0x7f090003;
+        public static final int peer_list=0x7f090004;
+        public static final int search=0x7f090005;
+        public static final int settings=0x7f090006;
     }
     public static final class string {
         public static final int action_settings=0x7f070005;
@@ -71,11 +83,16 @@ or to a theme attribute in the form "<code>?[<i>package</i>:][<i>type</i>:]<i>na
         public static final int copy=0x7f070009;
         public static final int details=0x7f07000a;
         public static final int download=0x7f070006;
+        public static final int initialnode=0x7f07000f;
+        public static final int mobiledata=0x7f07000e;
         public static final int search_hint=0x7f070001;
         public static final int share=0x7f070008;
         public static final int stream=0x7f070007;
         public static final int title_activity_audio_player=0x7f070003;
+        public static final int title_activity_peer_files=0x7f07000c;
+        public static final int title_activity_peer_list=0x7f07000b;
         public static final int title_activity_search=0x7f070004;
+        public static final int title_activity_settings=0x7f07000d;
         public static final int title_activity_video_player=0x7f070002;
     }
     public static final class style {

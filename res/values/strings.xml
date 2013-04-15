@@ -7,11 +7,15 @@
     <string name="title_activity_audio_player">Sandwich Audio Player</string>
     <string name="title_activity_search">Sandwich</string>
     <string name="action_settings">Settings</string>
-    
     <string name="download">Download File</string>
     <string name="stream">Stream Media</string>
     <string name="share">Share URL</string>
     <string name="copy">Copy URL</string>
     <string name="details">Details</string>
+    <string name="title_activity_peer_list">Peer List</string>
+    <string name="title_activity_peer_files">Peer Files</string>
+    <string name="title_activity_settings">Settings</string>
+    <string name="mobiledata">Use Mobile Data</string>
+    <string name="initialnode">Initial Node:</string>
 
 </resources>

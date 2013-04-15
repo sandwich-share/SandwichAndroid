@@ -64,7 +64,7 @@ public class AudioPlayer extends Activity {
     @Override
     public void onBackPressed()
     {
-		Intent i = new Intent(this, com.sandwich.Search.class);
+		Intent i = new Intent(this, com.sandwich.TabView.class);
 		startActivity(i);
 		
 		if (!player.isPlaying()) {

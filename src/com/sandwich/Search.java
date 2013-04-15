@@ -5,7 +5,6 @@ import com.sandwich.client.ResultListener;
 import com.sandwich.client.ResultListener.Result;
 import com.sandwich.ui.DetailsDialog;
 import com.sandwich.ui.Dialog;
-import com.sandwich.ui.SpinnerDialog;
 
 import android.os.Bundle;
 import android.view.ContextMenu;
@@ -18,17 +17,23 @@ import android.view.Window;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 import android.widget.EditText;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.ListView;
 import android.app.Activity;
 import android.content.Context;
 
 public class Search extends Activity implements TextView.OnEditorActionListener {
-	private ClientThread client;
-	private Thread thread;
+	private static ClientThread client;
 	private ListView list;
 	private EditText searchBox;
+	ProgressUpdater updater;
+	SearchListener listener;
 
+	public static void addClient(ClientThread t) {
+		client = t;
+	}
+	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -38,26 +43,27 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
 		
 		// Set the layout
 		setContentView(R.layout.activity_search);
-		
+        
+    	// Create the progress bar updater
+        ProgressBar progress = (ProgressBar)findViewById(R.id.updateBar);
+    	updater = new ProgressUpdater(this, progress);
+    	
+    	// Get the search listener
+    	listener = client.getSearchListener(this);
+    	
 		// Register for context menu on search results
 		list = (ListView) findViewById(R.id.resultsListView);
+        list.setAdapter(new ResultAdapter(this, R.layout.simplerow));
+        list.setOnItemClickListener(listener);
 		registerForContextMenu(list);
 		
 		// Setup search box
 		searchBox = (EditText) findViewById(R.id.searchBar);
 		searchBox.setOnEditorActionListener(this);
+		
+		// Register ourselves with the client thread
+		client.registerSearchActivity(this);
 
-    	// Create the bootstrapper thread
-        client = new ClientThread(this);
-        thread = null;
-        
-        // Call UI initialization code from the UI thread
-        client.initialize();
-        
-        // Bootstrap it
-    	thread = new Thread(client);
-    	thread.start();
-    	
     	// Begin search
     	onSearchRequested();
 	}
@@ -71,6 +77,9 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
 	
 	@Override
 	public boolean onSearchRequested() {
+		// Bootstrap
+		client.bootstrap();
+		
 		// Give focus to the search box
 		searchBox.requestFocus();
 		
@@ -149,12 +158,9 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
     
     @Override
     protected void onDestroy()
-    {    	
+    {
+    	client.registerSearchActivity(null);
     	unregisterForContextMenu(list);
-    	client.release();
-    	Dialog.closeDialogs();
-    	SpinnerDialog.closeDialogs();
-    	DetailsDialog.dismissDialogs();
     	
     	super.onDestroy();
     }
@@ -164,15 +170,7 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
 		
 		if (event != null) {
 			String query = view.getText().toString();
-			
-	        // Start the bootstrapping process if it's not already running
-	    	if (thread == null || thread.getState() == Thread.State.TERMINATED)
-	    	{
-	    		System.out.println("Starting new bootstrap thread");
-	    		thread = new Thread(client);
-	    		thread.start();
-	    	}
-			
+			client.bootstrap();
 			System.out.println("Searching: "+query);
 			client.doSearch(query);
 		}

@@ -152,5 +152,11 @@ public class PeerSet {
 			// The IP address is the unique portion
 			return getIpAddress().hashCode();
 		}
+		
+		@Override
+		public String toString()
+		{
+			return getIpAddress();
+		}
 	}
 }

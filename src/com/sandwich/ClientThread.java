@@ -6,13 +6,12 @@ import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
+import java.util.Set;
 
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.text.ClipboardManager;
-import android.widget.ListView;
-import android.widget.ProgressBar;
 
 import com.sandwich.client.Client;
 import com.sandwich.client.PeerSet.Peer;
@@ -22,27 +21,62 @@ import com.sandwich.ui.Dialog;
 
 @SuppressWarnings("deprecation") // Needed to avoid stupid warnings for older ClipboardManager class
 public class ClientThread implements Runnable {
-	private Activity activity;
+	private Context appContext;
+	private Activity mainActivity;
+	private Search searchActivity;
 	private Client client;
-	private SearchListener listener;
-	private ProgressUpdater updater;
 	private boolean loadedCache;
+	private Thread thread;
 	
-	public ClientThread(Activity activity)
+	public ClientThread(Activity mainActivity, Context appContext)
 	{
-		this.activity = activity;
-		this.client = null;
+		this.mainActivity = mainActivity;
+		this.appContext = appContext;
+	}
+	
+	public void bootstrap()
+	{
+        // Start the bootstrapping process if it's not already running
+    	if (thread == null || thread.getState() == Thread.State.TERMINATED)
+    	{
+    		System.out.println("Starting new bootstrap thread");
+    		thread = new Thread(this);
+    		thread.start();
+    	}
+	}
+	
+	public void registerSearchActivity(Search searchActivity)
+	{        
+		this.searchActivity = searchActivity;
+		
+		
+	}
+	
+	public SearchListener getSearchListener(Activity activity)
+	{
+		return new SearchListener(activity, client);
 	}
 	
 	public void doSearch(String query)
 	{
 		// A bit of a hack
-		listener.onQueryTextSubmit(query);
+		if (searchActivity != null)
+			searchActivity.listener.onQueryTextSubmit(query);
+	}
+	
+	public boolean getPeerIndex(String peer, ResultListener listener)
+	{
+		return client.getPeerIndex(peer, listener);
 	}
 	
 	public static boolean isResultStreamable(ResultListener.Result result)
 	{
 		return Client.isResultStreamable(result);
+	}
+	
+	public Set<Peer> getPeerSet()
+	{
+		return client.getPeerSet();
 	}
 	
 	public void copyUrl(ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
@@ -51,7 +85,7 @@ public class ClientThread implements Runnable {
 		Iterator<Peer> peers = result.getPeerIterator();
 		
 		// This class was deprecated in API level 11, but we need compatibility for API level 9
-		ClipboardManager clipboard = (ClipboardManager) activity.getSystemService(Context.CLIPBOARD_SERVICE);
+		ClipboardManager clipboard = (ClipboardManager) appContext.getSystemService(Context.CLIPBOARD_SERVICE);
 		
 		while (peers.hasNext())
 		{
@@ -103,7 +137,7 @@ public class ClientThread implements Runnable {
 		while (peers.hasNext())
 		{
 			try {
-				client.startFileStreamFromPeer(activity, peers.next(), result.result);
+				client.startFileStreamFromPeer(appContext, peers.next(), result.result);
 				break;
 			} catch (NoSuchAlgorithmException e) {
 				if (!peers.hasNext())
@@ -145,7 +179,7 @@ public class ClientThread implements Runnable {
 		shareIntent.putExtra(Intent.EXTRA_TEXT, url);
 		shareIntent.setType("text/plain");
 
-		activity.startActivity(Intent.createChooser(shareIntent, "Share to..."));
+		appContext.startActivity(Intent.createChooser(shareIntent, "Share to..."));
 	}
 	
 	public void endSearch() {
@@ -153,28 +187,16 @@ public class ClientThread implements Runnable {
 	}
 	
 	public void initialize()
-	{    	
+	{
     	if (client != null)
     		throw new IllegalStateException("Bootstrap thread was already initialized");
     	
     	// Create the client
-    	client = new Client(activity);
+    	client = new Client(appContext);
     	client.initialize();
-		
-        // Create our search listener
-        listener = new SearchListener(activity, client);
-        
-        // Add our array adapter to the list view
-        ListView results = (ListView)activity.findViewById(R.id.resultsListView);
-        results.setAdapter(new ResultAdapter(activity, R.layout.simplerow));
-        results.setOnItemClickListener(listener);
-        
-    	// Create the progress bar updater
-        ProgressBar progress = (ProgressBar)activity.findViewById(R.id.updateBar);
-    	updater = new ProgressUpdater(activity, progress);
     	
     	// Register our package manager with the MIME class
-    	MediaMimeInfo.registerPackageManager(activity.getPackageManager());
+    	MediaMimeInfo.registerPackageManager(appContext.getPackageManager());
 	}
 	
 	public void release()
@@ -200,10 +222,17 @@ public class ClientThread implements Runnable {
 			String initialHost = "isys-ubuntu.case.edu";
 
 			// Bootstrap from network
-			updater.reset();
-			updater.updateMax(client.bootstrapFromNetwork(initialHost, updater));
+			if (searchActivity != null)
+			{
+				searchActivity.updater.reset();
+			}
+			int max = client.bootstrapFromNetwork(initialHost, null);
+			if (searchActivity != null)
+			{
+				searchActivity.updater.updateMax(max);
+			}
 		} catch (Exception e) {
-			Dialog.displayDialog(activity, "Bootstrap Error", e.getMessage(), true);
+			Dialog.displayDialog(mainActivity, "Bootstrap Error", e.getMessage(), true);
 			e.printStackTrace();
 		}
 	}

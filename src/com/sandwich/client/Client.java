@@ -17,10 +17,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
+import java.util.Set;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -34,7 +36,6 @@ import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.player.MediaMimeInfo;
 
 import android.annotation.TargetApi;
-import android.app.Activity;
 import android.app.DownloadManager;
 import android.content.ContentValues;
 import android.content.Context;
@@ -80,6 +81,19 @@ public class Client {
 			return signed;
 		else
 			return signed+256;
+	}
+	
+	public Set<Peer> getPeerSet()
+	{
+		HashSet<Peer> peers = new HashSet<Peer>();
+		Iterator<Peer> i = this.peers.getPeerListIterator();
+		
+		while (i.hasNext())
+		{
+			peers.add(i.next());
+		}
+		
+		return peers;
 	}
 	
 	private boolean isNetworkActive()
@@ -609,6 +623,39 @@ public class Client {
 		return peers.getPeerListLength();
 	}
 	
+	public boolean getPeerIndex(String peerIp, ResultListener listener)
+	{
+		if (peers == null)
+		{
+			throw new IllegalStateException("Not bootstrapped");
+		}
+		
+		// Make sure the peer list isn't modified by the search threads while we're iterating
+		synchronized (peers) {
+			// Start search threads for each peer
+			Iterator<PeerSet.Peer> peerIterator = peers.getPeerListIterator();
+			while (peerIterator.hasNext())
+			{
+				PeerSet.Peer peer = peerIterator.next();
+				
+				// Check if this is the peer we want
+				if (peerIp.equals(peer.getIpAddress()))
+				{
+					// Start the search thread
+					System.out.println("Spawning thread to search "+peer.getIpAddress());
+					Thread t = new SearchThread(this, getPeerDatabase(peer), peer, listener, null);
+					synchronized (searchThreads) {
+						searchThreads.add(t);
+					}
+					t.start();
+					return true;
+				}
+			}
+		}
+		
+		return false;
+	}
+	
 	public int beginSearch(String query, ResultListener listener) throws IOException
 	{
 		int threads = 0;
@@ -688,7 +735,7 @@ public class Client {
 		return createPeerUrlString(peer.getIpAddress(), "/files/"+file, null);
 	}
 	
-	public boolean startFileStreamFromPeer(Activity activity, Peer peer, String file) throws NoSuchAlgorithmException, URISyntaxException, IOException
+	public boolean startFileStreamFromPeer(Context context, Peer peer, String file) throws NoSuchAlgorithmException, URISyntaxException, IOException
 	{
 		String url;
 		String mimeType;
@@ -703,16 +750,18 @@ public class Client {
 		else if (mimeType.startsWith("audio/"))
 		{
 			// Create the audio player activity
-			Intent i = new Intent(activity, com.sandwich.AudioPlayer.class);
+			Intent i = new Intent(context, com.sandwich.AudioPlayer.class);
 			i.putExtra("URL", url);
-			activity.startActivity(i);
+			i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			context.startActivity(i);
 		}
 		else if (mimeType.startsWith("video/"))
 		{
 			// Create the video player activity
-			Intent i = new Intent(activity, com.sandwich.VideoPlayer.class);
+			Intent i = new Intent(context, com.sandwich.VideoPlayer.class);
 			i.putExtra("URL", url);
-			activity.startActivity(i);
+			i.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+			context.startActivity(i);
 		}
 		else
 		{
@@ -908,7 +957,8 @@ class SearchThread extends Thread {
 	public void run() {
 		try {
 			Cursor c = peerindex.query(Client.getTableNameForPeer(peer),
-					new String[] {"FileName", "Size", "CheckSum"}, "FileName LIKE '%"+query+"%'",
+					new String[] {"FileName", "Size", "CheckSum"},
+					query != null ? "FileName LIKE '%"+query+"%'" : null,
 					null, null, null, null, ""+SearchListener.MAX_RESULTS);
 			
 			// Iterate the cursor
