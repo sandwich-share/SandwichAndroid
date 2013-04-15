@@ -2,22 +2,35 @@
 <resources>
 
     <string name="app_name">Sandwich</string>
-    <string name="search_hint">Search</string>
+    
+    <!-- Activity titles -->
+    <string name="title_activity_peer_list">Peer List</string>
+    <string name="title_activity_peer_files">Peer Files</string>
+    <string name="title_activity_settings">Settings</string>
     <string name="title_activity_video_player">Sandwich Video Player</string>
     <string name="title_activity_audio_player">Sandwich Audio Player</string>
     <string name="title_activity_search">Sandwich</string>
-    <string name="action_settings">Settings</string>
+    
+    <!-- File context menu strings -->
     <string name="download">Download File</string>
     <string name="stream">Stream Media</string>
     <string name="share">Share URL</string>
     <string name="copy">Copy URL</string>
     <string name="details">Details</string>
-    <string name="title_activity_peer_list">Peer List</string>
-    <string name="title_activity_peer_files">Peer Files</string>
-    <string name="title_activity_settings">Settings</string>
-    <string name="mobiledata">Use Mobile Data</string>
-    <string name="initialnode">Initial Node:</string>
+    
+    <!-- Peer context menu strings -->
     <string name="viewfiles">View File List</string>
     <string name="blacklist">Blacklist Peer</string>
+    
+    <!-- Search activity strings -->
+    <string name="search_hint">Search</string>
+
+    <!-- Settings activity strings -->
+    <string name="mobiledata">Use Mobile Data</string>
+    <string name="initialnode">Initial Node:</string>
+    
+    <!-- Audio player strings -->
+    <string name="play">Play</string>
+    <string name="initialtime">00:00 / 00:00</string>
 
 </resources>

@@ -22,7 +22,7 @@
         android:layout_alignParentBottom="true"
         android:layout_centerHorizontal="true"
         android:minWidth="100dip"
-        android:text="Play" />
+        android:text="@string/play" />
 
     <TextView
         android:id="@+id/timeView"
@@ -30,7 +30,7 @@
         android:layout_height="wrap_content"
         android:layout_above="@+id/seekBar"
         android:layout_centerHorizontal="true"
-        android:text="00:00 / 00:00"
+        android:text="@string/initialtime"
         android:textAppearance="?android:attr/textAppearanceLarge" />
 
     <TextView
@@ -42,6 +42,7 @@
         android:layout_alignRight="@+id/seekBar"
         android:layout_centerHorizontal="true"
         android:gravity="center"
+        android:textIsSelectable="false"
         android:textAppearance="?android:attr/textAppearanceMedium" />
 
     <ImageView
@@ -51,6 +52,7 @@
         android:layout_above="@+id/songText"
         android:layout_alignLeft="@+id/songText"
         android:layout_alignParentTop="true"
+        tools:ignore="ContentDescription"
         android:layout_alignRight="@+id/songText" />
 
 </RelativeLayout>
