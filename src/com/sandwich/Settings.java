@@ -13,14 +13,17 @@ import android.widget.CompoundButton.OnCheckedChangeListener;
 import android.widget.EditText;
 
 public class Settings extends Activity implements OnCheckedChangeListener, OnFocusChangeListener {
-	EditText bootstrapText;
-	CheckBox mobileData;
+	private EditText bootstrapText;
+	private CheckBox mobileData;
 	
-	public static final String INITIAL_NODE = "InitialNode";
-	public static final String MOBILE_DATA = "MobileData";
-	public static final String PREFS_FILE = "SandwichSettings";
+	private static final String INITIAL_NODE = "InitialNode";
+	private static final String MOBILE_DATA = "MobileData";
+	private static final String REFRESH_INTERVAL = "RefreshInterval";
+	
+	private static final String PREFS_FILE = "SandwichSettings";
 	
 	private static final String DEFAULT_INITIAL_NODE = "isys-ubuntu.case.edu";
+	private static int DEFAULT_REFRESH_INTERVAL = 60 * 1000; // 60 seconds
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -56,6 +59,12 @@ public class Settings extends Activity implements OnCheckedChangeListener, OnFoc
 	{
 		SharedPreferences prefs = context.getSharedPreferences(PREFS_FILE, 0);
 		return prefs.getString(INITIAL_NODE, DEFAULT_INITIAL_NODE);
+	}
+	
+	public static int getRefreshInterval(Context context)
+	{
+		SharedPreferences prefs = context.getSharedPreferences(PREFS_FILE, 0);
+		return prefs.getInt(REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL);
 	}
 	
 	public void updatePreferences()

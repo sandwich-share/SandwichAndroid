@@ -17,6 +17,7 @@ import android.widget.TabHost.TabSpec;
 @SuppressWarnings("deprecation")
 public class TabView extends TabActivity implements OnTabChangeListener {
 	private ClientThread client;
+	private BackgroundUpdater updater;
 	
 	private static final String SEARCH = "Search";
 	private static final String PEER_LIST = "Peer List";
@@ -30,7 +31,6 @@ public class TabView extends TabActivity implements OnTabChangeListener {
 		Search.addClient(client);
 		PeerList.addClient(client);
 		PeerFiles.addClient(client);
-		
 		super.onCreate(savedInstanceState);
 		
 		// No title
@@ -66,18 +66,24 @@ public class TabView extends TabActivity implements OnTabChangeListener {
 		
 		// Listen for tab changes
 		tabHost.setOnTabChangedListener(this);
+		
+		// Create the background updater
+		updater = new BackgroundUpdater(client, Settings.getRefreshInterval(this));
 	}
 	
 	@Override
 	protected void onResume() {
 		super.onResume();
 		
-		// Bootstrap again
-		client.bootstrap();
+		// Start the background updater again
+		updater.start();
 	}
 	
 	@Override
 	protected void onPause() {
+		// Halt the background updater
+		updater.stop();
+		
 		// End bootstrap before entering background
 		client.endBootstrap();
 		
@@ -101,9 +107,7 @@ public class TabView extends TabActivity implements OnTabChangeListener {
 	@Override
 	public void onTabChanged(String tag) {
 		// Update the peer list if we're changing to that tab
-		if (tag.equals(PEER_LIST))
-		{
-			client.bootstrap();
+		if (tag.equals(PEER_LIST)) {
 			PeerList.updateListView();
 		}
 		

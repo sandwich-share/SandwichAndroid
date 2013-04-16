@@ -64,9 +64,6 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
 	
 	@Override
 	public boolean onSearchRequested() {
-		// Bootstrap
-		client.bootstrap();
-		
 		// Give focus to the search box
 		searchBox.requestFocus();
 		
@@ -157,7 +154,6 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
 		
 		if (event != null) {
 			String query = view.getText().toString();
-			client.bootstrap();
 			System.out.println("Searching: "+query);
 			client.doSearch(query);
 		}
