@@ -292,7 +292,7 @@ public class Client {
 		{
 			JSONObject jsonPeer = jsonPeerList.getJSONObject(i);
 
-			peerSet.updatePeer(jsonPeer.getString("IP"), jsonPeer.getString("LastSeen"), jsonPeer.getLong("IndexHash"));
+			peerSet.updatePeer(jsonPeer.getString("IP"), jsonPeer.getString("LastSeen"), jsonPeer.getLong("IndexHash"), Peer.STATE_UNKNOWN);
 		}
 		
 		return peerSet;
@@ -306,7 +306,7 @@ public class Client {
 		c.moveToFirst();
 		while (!c.isAfterLast())
 		{
-			peers.updatePeer(c.getString(0), c.getString(2), c.getLong(1));
+			peers.updatePeer(c.getString(0), c.getString(2), c.getLong(1), Peer.STATE_UNKNOWN);
 			c.moveToNext();
 		}
 		
@@ -474,12 +474,20 @@ public class Client {
 				return;
 			} catch (ClientForbiddenException e) {
 				System.err.println("Peer list download forbidden for peer: "+selectedPeer.getIpAddress());
+				selectedPeer.setState(Peer.STATE_UPDATE_FORBIDDEN);
+				peers.updatePeer(selectedPeer);
+				PeerList.updateListView();
 			} catch (Exception e) {
 				// Make sure the network is available
 				if (!isNetworkActive())
 				{
 					throw new IllegalStateException("No network connection available");
 				}
+				
+				// Update failed
+				selectedPeer.setState(Peer.STATE_UPDATE_FAILED);
+				peers.updatePeer(selectedPeer);
+				PeerList.updateListView();
 				
 				// Failed to connect to this one, so prune it
 				selectedPeer.remove();
@@ -616,6 +624,9 @@ public class Client {
 							// Index is going away
 							peer.updateIndexHash(0);
 							
+							// Peer is blacklisted
+							peer.setState(Peer.STATE_BLACKLISTED);
+							
 							// Create an empty table for them
 							getPeerDatabase(peer).execSQL("DROP TABLE IF EXISTS "+Client.getTableNameForPeer(peer)+";");
 							getPeerDatabase(peer).execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY COLLATE NOCASE, Size INTEGER, CheckSum INTEGER);");
@@ -637,6 +648,9 @@ public class Client {
 						oldHash = getOldHashOfPeerIndex(peer);
 						if (oldHash == peer.getIndexHash())
 						{
+							// Peer is up to date
+							peer.setState(Peer.STATE_UP_TO_DATE);
+							
 							System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
 							
 							// Don't download anything
@@ -644,7 +658,7 @@ public class Client {
 						}
 						
 						// No updater running and index is not up to date
-						peer.setIndexUpdating(true);
+						peer.setState(Peer.STATE_UPDATING);
 						Thread t = new IndexDownloadThread(this, getPeerDatabase(peer), peer, listener, killDownload);
 						indexDownloadThreads.put(peer, t);
 						t.start();
@@ -994,17 +1008,25 @@ class IndexDownloadThread extends Thread {
 			// Update the peer table in memory
 			peer.updateIndexHash(indexHash);
 			peer.updateTimestamp(timeStamp);
-			peer.setIndexUpdating(false);
+			peer.setState(Peer.STATE_UP_TO_DATE);
 			client.peers.updatePeer(peer);
-			
-			// Redraw the peer table
-			PeerList.updateListView();
 			
 			System.out.println("Index for "+peer.getIpAddress()+" downloaded (hash: "+peer.getIndexHash()+")");
 		} catch (ClientForbiddenException e) {
 			System.err.println("Index download forbidden on peer: "+peer.getIpAddress());
+			
+			// Update was forbidden
+			peer.setState(Peer.STATE_UPDATE_FORBIDDEN);
+			client.peers.updatePeer(peer);
 		} catch (Exception e) {
 			System.err.println("Failed to download index for peer: "+peer.getIpAddress());
+			
+			if (e.getMessage() != null)
+				System.err.println(e.getMessage());
+			
+			// Update failed
+			peer.setState(Peer.STATE_UPDATE_FAILED);
+			client.peers.updatePeer(peer);
 			
 			// Remove this peer from the peer set
 			peer.remove();
@@ -1012,6 +1034,9 @@ class IndexDownloadThread extends Thread {
 			// Remove them from the database
 			client.deletePeerFromDatabase(peer);
 		} finally {
+			// Update the peer list
+			PeerList.updateListView();
+			
 			// Cleanup the socket and reader
 			try {
 				if (in != null)
@@ -1091,9 +1116,13 @@ class SearchThread extends Thread {
 			while (count == LIMIT_PER_QUERY);
 		} catch (SQLiteException e) {
 			System.err.println("Failed to search index for peer: "+peer.getIpAddress());
+			e.printStackTrace();
 			
 			// Remove this peer from the peer set
 			peer.remove();
+			
+			// Update peer list
+			PeerList.updateListView();
 			
 			// Drop them from the database
 			client.deletePeerFromDatabase(peer);

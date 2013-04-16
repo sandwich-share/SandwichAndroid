@@ -88,19 +88,11 @@ public class PeerList extends Activity implements OnItemClickListener {
         switch (item.getItemId())
         {
         case R.id.blacklist:
-        	if (client.blacklist.isBlacklisted(peer.getIpAddress()))
-        	{
+        	if (client.blacklist.isBlacklisted(peer.getIpAddress())) {
         		client.blacklist.removeFromBlacklist(peer.getIpAddress());
-        		peer.setBlacklisted(false);
-        	}
-        	else
-        	{
+        	} else {
         		client.blacklist.addToBlacklist(peer.getIpAddress());
-        		peer.setBlacklisted(true);
         	}
-        	
-        	// Reload the list view
-        	updateListView();
         	
         	// Bootstrap so the changes take effect
         	client.bootstrap();
@@ -130,7 +122,6 @@ public class PeerList extends Activity implements OnItemClickListener {
 						adapter.clear();
 						for (Peer p : peerSet)
 						{
-							p.setBlacklisted(client.blacklist.isBlacklisted(p.getIpAddress()));
 							adapter.add(p);
 						}
 					}

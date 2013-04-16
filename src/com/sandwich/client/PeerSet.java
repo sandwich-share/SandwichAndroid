@@ -31,8 +31,7 @@ public class PeerSet {
 			// Update an existing peer
 			oldPeer.indexHash = p.indexHash;
 			oldPeer.timestamp = p.timestamp;
-			oldPeer.blacklisted = p.blacklisted;
-			oldPeer.indexUpdating = p.indexUpdating;
+			oldPeer.state = p.state;
 		}
 		else
 		{
@@ -42,9 +41,9 @@ public class PeerSet {
 		}
 	}
 	
-	public synchronized void updatePeer(String ip, String timestamp, long indexHash)
+	public synchronized void updatePeer(String ip, String timestamp, long indexHash, int state)
 	{
-		updatePeer(new Peer(ip, timestamp, indexHash));
+		updatePeer(new Peer(ip, timestamp, indexHash, state));
 	}
 	
 	public synchronized boolean removePeer(String ip)
@@ -82,17 +81,22 @@ public class PeerSet {
 		private long indexHash;
 		private PeerSet peerSet;
 		private String timestamp;
-		private boolean blacklisted;
-		private boolean indexUpdating;
+		private int state;
 		
-		public Peer(String ip, String timestamp, long indexHash)
+		public static final int STATE_UNKNOWN = 0;
+		public static final int STATE_UP_TO_DATE = 1;
+		public static final int STATE_UPDATING = 2;
+		public static final int STATE_UPDATE_FAILED = 3;
+		public static final int STATE_BLACKLISTED = 4;
+		public static final int STATE_UPDATE_FORBIDDEN = 5;
+		
+		public Peer(String ip, String timestamp, long indexHash, int state)
 		{
 			this.ip = ip;
 			this.indexHash = indexHash;
 			this.peerSet = null;
 			this.timestamp = timestamp;
-			this.blacklisted = false;
-			this.indexUpdating = false;
+			this.state = state;
 		}
 		
 		public Peer(Peer p)
@@ -101,8 +105,7 @@ public class PeerSet {
 			this.indexHash = p.indexHash;
 			this.peerSet = null;
 			this.timestamp = p.timestamp;
-			this.blacklisted = p.blacklisted;
-			this.indexUpdating = p.indexUpdating;
+			this.state = p.state;
 		}
 		
 		private void setPeerSet(PeerSet peerSet)
@@ -148,19 +151,14 @@ public class PeerSet {
 			indexHash = newHash;
 		}
 		
-		public void setBlacklisted(boolean blacklisted)
+		public void setState(int state)
 		{
-			this.blacklisted = blacklisted;
+			this.state = state;
 		}
 		
-		public void setIndexUpdating(boolean indexUpdating)
+		public int getState()
 		{
-			this.indexUpdating = indexUpdating;
-		}
-		
-		public boolean isIndexUpdating()
-		{
-			return indexUpdating;
+			return state;
 		}
 		
 		@Override
@@ -185,12 +183,31 @@ public class PeerSet {
 		@Override
 		public String toString()
 		{
+			// Start with the IP address
 			String str = getIpAddress();
 			
-			if (blacklisted) {
+			// Append some state details
+			switch (state) {
+			case STATE_BLACKLISTED:
 				str += " (Blacklisted)";
-			} else if (indexUpdating) {
+				break;
+				
+			case STATE_UPDATING:
 				str += " (Index Updating)";
+				break;
+				
+			case STATE_UPDATE_FAILED:
+				str += " (Update Failed)";
+				break;
+				
+			case STATE_UPDATE_FORBIDDEN:
+				str += " (Update Rejected)";
+				break;
+				
+			case STATE_UP_TO_DATE:
+			case STATE_UNKNOWN:
+			default:
+				break;
 			}
 			
 			return str;
