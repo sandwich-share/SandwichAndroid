@@ -3,6 +3,7 @@ package com.sandwich.ui;
 import java.util.ArrayList;
 
 import com.sandwich.client.Client;
+import com.sandwich.client.PeerSet;
 import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.client.ResultListener;
 
@@ -14,8 +15,10 @@ import android.content.DialogInterface.OnClickListener;
 
 public class DetailsDialog implements OnClickListener, Runnable {
 	private Activity activity;
-	private ResultListener.Result result;
 	private AlertDialog dialog;
+	
+	private ResultListener.Result result;
+	private PeerSet.Peer peer;
 	
 	private static ArrayList<AlertDialog> dialogs = new ArrayList<AlertDialog>();
 	
@@ -23,6 +26,12 @@ public class DetailsDialog implements OnClickListener, Runnable {
 	{
 		this.activity = activity;
 		this.result = result;
+	}
+	
+	public DetailsDialog(Activity activity, PeerSet.Peer peer)
+	{
+		this.activity = activity;
+		this.peer = peer;
 	}
 	
     public void createDetailsDialog()
@@ -64,29 +73,65 @@ public class DetailsDialog implements OnClickListener, Runnable {
 	    	AlertDialog.Builder builder = new AlertDialog.Builder(activity);
 	    	String peerList;
 	    	
-	    	builder.setTitle(result.result);
 	    	builder.setNeutralButton("OK", this);
 	    	
-	    	String streamable;
-	    	if (Client.isResultStreamable(result))
-	    		streamable = "Yes";
-	    	else
-	    		streamable = "No";
-	    	
-	    	// Create the peer list
-	    	peerList = null;
-	    	for (Peer p : result.peers)
-	    	{
-	    		if (peerList == null)
-	    			peerList = p.getIpAddress();
-	    		else
-	    			peerList += ", "+p.getIpAddress();
+	    	if (result != null) {
+		    	builder.setTitle(result.result);
+
+		    	String streamable;
+		    	if (Client.isResultStreamable(result))
+		    		streamable = "Yes";
+		    	else
+		    		streamable = "No";
+		    	
+		    	// Create the peer list
+		    	peerList = null;
+		    	for (Peer p : result.peers)
+		    	{
+		    		if (peerList == null)
+		    			peerList = p.getIpAddress();
+		    		else
+		    			peerList += ", "+p.getIpAddress();
+		    	}
+		    	
+		    	// Create the size string
+		    	String size = humanReadableByteCount(result.size);
+		    	
+		    	builder.setMessage("Peers: "+peerList+"\nSize: "+size+"\nStreamable: "+streamable);
+	    	} else {
+	    		builder.setTitle(peer.getIpAddress());
+	    		
+	    		String state;
+	    		switch (peer.getState())
+	    		{
+	    		case Peer.STATE_BLACKLISTED:
+	    			state = "Blacklisted";
+	    			break;
+	    			
+	    		case Peer.STATE_UP_TO_DATE:
+	    			state = "Up-to-date";
+	    			break;
+	    			
+	    		case Peer.STATE_UPDATE_FAILED:
+	    			state = "Update Failed";
+	    			break;
+	    			
+	    		case Peer.STATE_UPDATE_FORBIDDEN:
+	    			state = "Update Forbidden";
+	    			break;
+	    			
+	    		case Peer.STATE_UPDATING:
+	    			state = "Updating";
+	    			break;
+	    			
+	    		default:
+	    		case Peer.STATE_UNKNOWN:
+	    			state = "Unknown";
+	    			break;
+	    		}
+	    		
+	    		builder.setMessage("State: "+state+"\nIndex Hash: "+peer.getIndexHash()+"\nLast Seen: "+peer.getTimestamp());
 	    	}
-	    	
-	    	// Create the size string
-	    	String size = humanReadableByteCount(result.size);
-	    	
-	    	builder.setMessage("Peers: "+peerList+"\nSize: "+size+"\nStreamable: "+streamable);
 	    	
 	    	dialog = builder.create();
 			dialog.show();

@@ -4,4 +4,6 @@
           android:title="@string/viewfiles" />
     <item android:id="@+id/blacklist"
           android:title="@string/blacklist" />
+    <item android:id="@+id/details"
+          android:title="@string/details" />
 </menu>

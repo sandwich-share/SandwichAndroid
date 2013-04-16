@@ -4,6 +4,8 @@ import java.util.Set;
 
 import com.sandwich.client.PeerSet;
 import com.sandwich.client.PeerSet.Peer;
+import com.sandwich.ui.DetailsDialog;
+import com.sandwich.ui.Dialog;
 
 import android.os.Bundle;
 import android.view.ContextMenu;
@@ -96,6 +98,14 @@ public class PeerList extends Activity implements OnItemClickListener {
         	
         	// Bootstrap so the changes take effect
         	client.bootstrap();
+        	return true;
+        	
+        case R.id.details:
+        	try {
+        		new DetailsDialog(this, peer).createDetailsDialog();
+        	} catch (Exception e) {
+        		Dialog.displayDialog(this, "Error", e.getMessage(), false);
+        	}
         	return true;
         	
         case R.id.viewfiles:
