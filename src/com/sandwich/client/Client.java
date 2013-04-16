@@ -32,6 +32,7 @@ import org.json.JSONObject;
 import com.fasterxml.jackson.core.JsonFactory;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
+import com.sandwich.PeerList;
 import com.sandwich.Settings;
 import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.player.MediaMimeInfo;
@@ -237,21 +238,25 @@ public class Client {
 		return new URL(urlString);
 	}
 	
-	static InputStream getInputStreamFromConnection(HttpURLConnection conn) throws IOException
+	static InputStream getInputStreamFromConnection(HttpURLConnection conn) throws IOException, ClientForbiddenException
 	{
 		int responseCode;
 
 		// Send the GET request and get the response code
 		responseCode = sendGetRequest(conn);
-		if (responseCode != HttpURLConnection.HTTP_OK)
+		if (responseCode == HttpURLConnection.HTTP_FORBIDDEN)
 		{
-			throw new ConnectException("Failed to get peer list from bootstrap peer");
+			throw new ClientForbiddenException();
+		}
+		else if (responseCode != HttpURLConnection.HTTP_OK)
+		{
+			throw new ConnectException("Failed to get peer list from bootstrap peer: "+responseCode);
 		}
 		
 		return conn.getInputStream();
 	}
 	
-	private PeerSet getPeerList(URL bootstrapUrl) throws IOException, JSONException
+	private PeerSet getPeerList(URL bootstrapUrl) throws IOException, JSONException, ClientForbiddenException
 	{
 		URL queryUrl;
 		Scanner in;
@@ -435,40 +440,28 @@ public class Client {
 	private void downloadPeerList(String initialPeer) throws NoSuchAlgorithmException, URISyntaxException, IOException, JSONException
 	{
 		URL bootstrapUrl;
-		Iterator<PeerSet.Peer> iterator;
 		Random rand = new Random();
+		ArrayList<PeerSet.Peer> availablePeers = new ArrayList<PeerSet.Peer>(peers.getPeerListLength());
 		
 		checkNetworkOK();
 		
 		System.out.println("Downloading the peer list");
 		
+		// Add peers to our temporary list
+		Iterator<PeerSet.Peer> iterator = peers.getPeerListIterator();
+		while (iterator.hasNext())
+			availablePeers.add(iterator.next());
+		
 		// Bootstrap from a random peer
 		rand.setSeed(System.currentTimeMillis());
-		while (peers.getPeerListLength() > 0)
+		while (availablePeers.size() > 0)
 		{
 			// Generate a random peer to bootstrap from
-			int nextPeer = rand.nextInt(peers.getPeerListLength());
+			int nextPeer = rand.nextInt(availablePeers.size());
 			System.out.println("Bootstrapping from peer index: "+nextPeer);
 			
-			// Get the peer object for the index
-			iterator = peers.getPeerListIterator();
-			PeerSet.Peer selectedPeer = null;
-			for (int i = 0; iterator.hasNext(); i++)
-			{
-				PeerSet.Peer currentPeer = iterator.next();
-				
-				if (i == nextPeer)
-				{
-					selectedPeer = currentPeer;
-					break;
-				}
-			}
-			
-			// Make sure it worked
-			if (selectedPeer == null)
-			{
-				break;
-			}
+			// Get the random peer
+			PeerSet.Peer selectedPeer = availablePeers.get(nextPeer);
 				
 			try {
 				// Resolve address and create a URL
@@ -479,6 +472,8 @@ public class Client {
 				
 				// If we get here, bootstrapping was successful
 				return;
+			} catch (ClientForbiddenException e) {
+				System.err.println("Peer list download forbidden for peer: "+selectedPeer.getIpAddress());
 			} catch (Exception e) {
 				// Make sure the network is available
 				if (!isNetworkActive())
@@ -492,6 +487,9 @@ public class Client {
 				// Drop it from the database
 				deletePeerFromDatabase(selectedPeer);
 			}
+			
+			// Something failed if we got here, so remove them from our available peer list
+			availablePeers.remove(selectedPeer);
 		}
 
 		// Try the initial peer if all else fails
@@ -507,7 +505,7 @@ public class Client {
 			// It worked
 			return;
 		} catch (Exception e) {
-			// Failed to connect to the initial peer, so let's try another one
+			// Failed to connect to the initial peer
 		}
 		
 		// We're out of people to bootstrap from
@@ -646,6 +644,7 @@ public class Client {
 						}
 						
 						// No updater running and index is not up to date
+						peer.setIndexUpdating(true);
 						Thread t = new IndexDownloadThread(this, getPeerDatabase(peer), peer, listener, killDownload);
 						indexDownloadThreads.put(peer, t);
 						t.start();
@@ -654,6 +653,9 @@ public class Client {
 				}
 			}
 		}
+		
+		// Update the list view
+		PeerList.updateListView();
 		
 		return threads;
 	}
@@ -990,9 +992,17 @@ class IndexDownloadThread extends Thread {
 			client.database.insert(Client.PEER_TABLE, null, vals);
 			
 			// Update the peer table in memory
-			client.peers.updatePeer(peer.getIpAddress(), timeStamp, indexHash);
+			peer.updateIndexHash(indexHash);
+			peer.updateTimestamp(timeStamp);
+			peer.setIndexUpdating(false);
+			client.peers.updatePeer(peer);
+			
+			// Redraw the peer table
+			PeerList.updateListView();
 			
 			System.out.println("Index for "+peer.getIpAddress()+" downloaded (hash: "+peer.getIndexHash()+")");
+		} catch (ClientForbiddenException e) {
+			System.err.println("Index download forbidden on peer: "+peer.getIpAddress());
 		} catch (Exception e) {
 			System.err.println("Failed to download index for peer: "+peer.getIpAddress());
 			

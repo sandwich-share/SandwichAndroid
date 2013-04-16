@@ -23,6 +23,7 @@ public class PeerList extends Activity implements OnItemClickListener {
 	private static ClientThread client;
 	private ListView peerList;
 	private static ArrayAdapter<Peer> adapter;
+	private static Activity thisActivity;
 	
 	public static void addClient(ClientThread t) {
 		client = t;
@@ -33,13 +34,30 @@ public class PeerList extends Activity implements OnItemClickListener {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_peer_list);
 		
+		// This is the current peer list activity
+		thisActivity = this;
+		
 		// Setup the list view
 		peerList = (ListView)findViewById(R.id.peersListView);
 		adapter = new ArrayAdapter<Peer>(this, R.layout.simplerow);
         peerList.setAdapter(adapter);
         peerList.setOnItemClickListener(this); 
         registerForContextMenu(peerList);
+	}
+	
+	@Override
+	protected void onResume() {
+		super.onResume();
+		
+        // Update the list view
         updateListView();
+	}
+	
+	@Override
+	protected void onDestroy() {
+		// Deregister our activity
+		thisActivity = null;
+		super.onDestroy();
 	}
 	
 	@Override
@@ -101,16 +119,23 @@ public class PeerList extends Activity implements OnItemClickListener {
 
 	public static void updateListView()
 	{
-		Set<Peer> peerSet = client.getPeerSet();
-		System.out.println("Refreshing peer list");
-		
-		if (adapter != null) {
-			adapter.clear();
-			for (Peer p : peerSet)
-			{
-				p.setBlacklisted(client.blacklist.isBlacklisted(p.getIpAddress()));
-				adapter.add(p);
-			}
+		if (thisActivity != null) {
+			thisActivity.runOnUiThread(new Runnable() {
+				@Override
+				public void run() {
+					Set<Peer> peerSet = client.getPeerSet();
+					System.out.println("Refreshing peer list");
+					
+					if (adapter != null) {
+						adapter.clear();
+						for (Peer p : peerSet)
+						{
+							p.setBlacklisted(client.blacklist.isBlacklisted(p.getIpAddress()));
+							adapter.add(p);
+						}
+					}
+				}
+			});
 		}
 	}
 	

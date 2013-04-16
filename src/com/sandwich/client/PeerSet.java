@@ -31,6 +31,8 @@ public class PeerSet {
 			// Update an existing peer
 			oldPeer.indexHash = p.indexHash;
 			oldPeer.timestamp = p.timestamp;
+			oldPeer.blacklisted = p.blacklisted;
+			oldPeer.indexUpdating = p.indexUpdating;
 		}
 		else
 		{
@@ -81,6 +83,7 @@ public class PeerSet {
 		private PeerSet peerSet;
 		private String timestamp;
 		private boolean blacklisted;
+		private boolean indexUpdating;
 		
 		public Peer(String ip, String timestamp, long indexHash)
 		{
@@ -89,6 +92,7 @@ public class PeerSet {
 			this.peerSet = null;
 			this.timestamp = timestamp;
 			this.blacklisted = false;
+			this.indexUpdating = false;
 		}
 		
 		public Peer(Peer p)
@@ -98,6 +102,7 @@ public class PeerSet {
 			this.peerSet = null;
 			this.timestamp = p.timestamp;
 			this.blacklisted = p.blacklisted;
+			this.indexUpdating = p.indexUpdating;
 		}
 		
 		private void setPeerSet(PeerSet peerSet)
@@ -108,6 +113,11 @@ public class PeerSet {
 		public PeerSet getPeerSet()
 		{
 			return peerSet;
+		}
+		
+		public void updateTimestamp(String timestamp)
+		{
+			this.timestamp = timestamp;
 		}
 		
 		public boolean remove()
@@ -143,6 +153,16 @@ public class PeerSet {
 			this.blacklisted = blacklisted;
 		}
 		
+		public void setIndexUpdating(boolean indexUpdating)
+		{
+			this.indexUpdating = indexUpdating;
+		}
+		
+		public boolean isIndexUpdating()
+		{
+			return indexUpdating;
+		}
+		
 		@Override
 		public boolean equals(Object o)
 		{
@@ -169,6 +189,8 @@ public class PeerSet {
 			
 			if (blacklisted) {
 				str += " (Blacklisted)";
+			} else if (indexUpdating) {
+				str += " (Index Updating)";
 			}
 			
 			return str;

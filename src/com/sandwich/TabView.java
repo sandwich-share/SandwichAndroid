@@ -18,6 +18,7 @@ import android.widget.TabHost.TabSpec;
 public class TabView extends TabActivity implements OnTabChangeListener {
 	private ClientThread client;
 	private BackgroundUpdater updater;
+	private String lastTab;
 	
 	private static final String SEARCH = "Search";
 	private static final String PEER_LIST = "Peer List";
@@ -106,13 +107,16 @@ public class TabView extends TabActivity implements OnTabChangeListener {
 
 	@Override
 	public void onTabChanged(String tag) {
-		// Update the peer list if we're changing to that tab
-		if (tag.equals(PEER_LIST)) {
-			PeerList.updateListView();
+		// Bootstrap if we're leaving the settings tab
+		if (lastTab != null && lastTab.equals(SETTINGS)) {
+			client.bootstrap();
 		}
 		
 		// Hide the keyboard when switching tabs
 		InputMethodManager imm = (InputMethodManager) getSystemService(Activity.INPUT_METHOD_SERVICE);
 		imm.toggleSoftInput(InputMethodManager.SHOW_IMPLICIT, 0);
+		
+		// Store the last tab
+		lastTab = tag;
 	}
 }
