@@ -76,7 +76,7 @@ public class PeerSet {
 		return peerSet.values().iterator();
 	}
 	
-	public class Peer {
+	public class Peer implements Comparable<Peer> {
 		private String ip;
 		private long indexHash;
 		private PeerSet peerSet;
@@ -211,6 +211,11 @@ public class PeerSet {
 			}
 			
 			return str;
+		}
+
+		@Override
+		public int compareTo(Peer otherPeer) {
+			return getIpAddress().compareTo(otherPeer.getIpAddress());
 		}
 	}
 }

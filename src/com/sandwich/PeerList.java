@@ -1,6 +1,8 @@
 package com.sandwich;
 
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 import com.sandwich.client.PeerSet;
 import com.sandwich.client.PeerSet.Peer;
@@ -9,6 +11,7 @@ import com.sandwich.ui.Dialog;
 
 import android.os.Bundle;
 import android.view.ContextMenu;
+import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -26,6 +29,7 @@ public class PeerList extends Activity implements OnItemClickListener {
 	private ListView peerList;
 	private static ArrayAdapter<Peer> adapter;
 	private static Activity thisActivity;
+	private static boolean suspendUpdates, queuedUpdate;
 	
 	public static void addClient(ClientThread t) {
 		client = t;
@@ -64,8 +68,12 @@ public class PeerList extends Activity implements OnItemClickListener {
 	
 	@Override
     public void onCreateContextMenu(ContextMenu menu, View v, ContextMenuInfo menuInfo) {
-        super.onCreateContextMenu(menu, v, menuInfo);
-        
+        // Disable updates to the peerlist while displaying the context menu
+		suspendUpdates = true;
+		
+		// Call superclass
+		super.onCreateContextMenu(menu, v, menuInfo);
+                
         AdapterContextMenuInfo info = (AdapterContextMenuInfo) menuInfo;
         PeerSet.Peer peer = (PeerSet.Peer) adapter.getItem(info.position);
         if (peer == null)
@@ -82,6 +90,18 @@ public class PeerList extends Activity implements OnItemClickListener {
         	menu.getItem(1).setTitle("Unblacklist Peer");
         }
     }
+	
+	@Override
+	public void onContextMenuClosed(Menu menu) {
+		// Restart updating
+		suspendUpdates = false;
+		
+		// Update if requested
+		if (queuedUpdate) {
+			queuedUpdate = false;
+			updateListView();
+		}
+	}
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
@@ -121,16 +141,25 @@ public class PeerList extends Activity implements OnItemClickListener {
 
 	public static void updateListView()
 	{
+		// Queue an async update if updates are suspended
+		if (suspendUpdates) {
+			queuedUpdate = true;
+			return;
+		}
+		
 		if (thisActivity != null) {
 			thisActivity.runOnUiThread(new Runnable() {
 				@Override
 				public void run() {
-					Set<Peer> peerSet = client.getPeerSet();
+					List<Peer> peerList = new ArrayList<Peer>(client.getPeerSet());
 					System.out.println("Refreshing peer list");
+					
+					// Sort the list alphabetically
+					Collections.sort(peerList);
 					
 					if (adapter != null) {
 						adapter.clear();
-						for (Peer p : peerSet)
+						for (Peer p : peerList)
 						{
 							adapter.add(p);
 						}
