@@ -23,6 +23,10 @@ import java.util.Map;
 import java.util.Random;
 import java.util.Scanner;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.json.JSONArray;
@@ -58,11 +62,16 @@ public class Client {
 	PeerSet peers;
 	
 	private AtomicBoolean killSearch, killDownload;
-	private ArrayList<Thread> searchThreads;
-	private HashMap<PeerSet.Peer, Thread> indexDownloadThreads;
 	
-	SQLiteDatabase database;
 	private HashMap<PeerSet.Peer, SQLiteDatabase> peerDatabases;
+	
+	// Accessed by child tasks
+	ConcurrentHashMap<PeerSet.Peer, Runnable> downloadTasks;
+	ConcurrentHashMap<PeerSet.Peer, Runnable> searchTasks;
+	SQLiteDatabase database;
+	
+	private ThreadPoolExecutor searchPool;
+	private ThreadPoolExecutor downloadPool;
 	
 	private static final String CREATE_PEER_TABLE = "CREATE TABLE IF NOT EXISTS peers (IP TEXT PRIMARY KEY, IndexHash INT, LastSeen TEXT);";
 
@@ -72,12 +81,14 @@ public class Client {
 	public Client(Context context)
 	{
 		this.context = context;
-		this.searchThreads = new ArrayList<Thread>();
-		this.indexDownloadThreads = new HashMap<PeerSet.Peer, Thread>();
 		this.peerDatabases = new HashMap<PeerSet.Peer, SQLiteDatabase>();
 		this.peers = new PeerSet();
 		this.killSearch = new AtomicBoolean();
 		this.killDownload = new AtomicBoolean();
+		this.searchPool = new ThreadPoolExecutor(1, Integer.MAX_VALUE, Long.MAX_VALUE, TimeUnit.NANOSECONDS, new LinkedBlockingQueue<Runnable>());
+		this.downloadPool = new ThreadPoolExecutor(1, Integer.MAX_VALUE, Long.MAX_VALUE, TimeUnit.NANOSECONDS, new LinkedBlockingQueue<Runnable>());
+		this.downloadTasks = new ConcurrentHashMap<PeerSet.Peer, Runnable>();
+		this.searchTasks = new ConcurrentHashMap<PeerSet.Peer, Runnable>();
 	}
 	
 	// Holy fucking shit
@@ -522,24 +533,27 @@ public class Client {
 	
 	public void waitForBootstrap()
 	{
-		synchronized (indexDownloadThreads) {
-			// Wait for them to die
-			for (Thread t : indexDownloadThreads.values())
-			{
-				try {
-					t.join();
-				} catch (InterruptedException e) {}
-			}
-			
-			// Everyone's dead
-			indexDownloadThreads.clear();
-		}
+		try {
+			downloadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+		} catch (InterruptedException e) { }
 	}
 	
 	public void endBootstrap()
 	{
-		// Start the killing
+		for (Map.Entry<PeerSet.Peer, Runnable> entries : downloadTasks.entrySet())
+		{
+			// Remove all entries we can
+			if (downloadPool.remove(entries.getValue())) {
+				// Task didn't run, so we need to remove it from our search tasks map
+				downloadTasks.remove(entries.getKey());
+			}
+		}
+		
+		// Kill tasks in progress
 		killDownload.set(true);
+		
+		// Purge the pool
+		downloadPool.purge();
 	}
 	
 	public static String getUriForResult(Peer peer, ResultListener.Result result) throws UnknownHostException, NoSuchAlgorithmException, URISyntaxException
@@ -577,7 +591,7 @@ public class Client {
 	public int bootstrapFromNetwork(String initialPeer, IndexDownloadListener listener, Set<String> blacklist) throws IOException, JSONException, InterruptedException, NoSuchAlgorithmException, URISyntaxException
 	{
 		Iterator<PeerSet.Peer> iterator;
-		int threads = 0;
+		int downloads = 0;
 
 		// Download the peer list
 		downloadPeerList(initialPeer);
@@ -585,114 +599,96 @@ public class Client {
 		// Stop killing downloads
 		killDownload.set(false);
 		
-		// Reap threads that aren't still downloading
-		ArrayList<PeerSet.Peer> reapList = new ArrayList<PeerSet.Peer>();
-		synchronized (indexDownloadThreads) {
-			// Add dead threads to the reap list
-			for (Map.Entry<PeerSet.Peer, Thread> entry : indexDownloadThreads.entrySet())
-			{
-				if (entry.getValue().getState() == Thread.State.TERMINATED)
-					reapList.add(entry.getKey());
-			}
+		// Iterate the peer list and download indexes for each
+		iterator = peers.getPeerListIterator();
+		while (iterator.hasNext())
+		{
+			PeerSet.Peer peer = iterator.next();
+			long oldHash;
 			
-			// Reap dead threads
-			for (PeerSet.Peer p : reapList)
+			// Check if an updater is already running for this peer
+			if (!downloadTasks.containsKey(peer))
 			{
-				indexDownloadThreads.remove(p);
-			}
-		}
-		
-		// We have to do this in a synchronized block so our index download threads
-		// can't touch it while we're downloading
-		synchronized (peers) {
-			// Iterate the peer list and download indexes for each
-			iterator = peers.getPeerListIterator();
-			while (iterator.hasNext())
-			{
-				PeerSet.Peer peer = iterator.next();
-				long oldHash;
-				
-				synchronized (indexDownloadThreads) {
-					// Check if an updater is already running for this peer
-					if (!indexDownloadThreads.containsKey(peer))
-					{
-						// Check if the peer is blacklisted
-						if (blacklist.contains(peer.getIpAddress()))
-						{
-							System.out.println(peer.getIpAddress()+" is blacklisted");
-							
-							// Index is going away
-							peer.updateIndexHash(0);
-							
-							// Peer is blacklisted
-							peer.setState(Peer.STATE_BLACKLISTED);
-							
-							// Create an empty table for them
-							getPeerDatabase(peer).execSQL("DROP TABLE IF EXISTS "+Client.getTableNameForPeer(peer)+";");
-							getPeerDatabase(peer).execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY COLLATE NOCASE, Size INTEGER, CheckSum INTEGER);");
-							
-							// Create the values to be stored in the SQL database
-							ContentValues vals = new ContentValues();
-							vals.put("IP", peer.getIpAddress());
-							vals.put("IndexHash", peer.getIndexHash());
-							vals.put("LastSeen", peer.getTimestamp());
+				// Check if the peer is blacklisted
+				if (blacklist.contains(peer.getIpAddress()))
+				{
+					System.out.println(peer.getIpAddress()+" is blacklisted");
+					
+					// Index is going away
+					peer.updateIndexHash(0);
+					
+					// Peer is blacklisted
+					peer.setState(Peer.STATE_BLACKLISTED);
+					
+					// Create an empty table for them
+					getPeerDatabase(peer).execSQL("DROP TABLE IF EXISTS "+Client.getTableNameForPeer(peer)+";");
+					getPeerDatabase(peer).execSQL("CREATE TABLE "+Client.getTableNameForPeer(peer)+" (FileName TEXT PRIMARY KEY COLLATE NOCASE, Size INTEGER, CheckSum INTEGER);");
+					
+					// Create the values to be stored in the SQL database
+					ContentValues vals = new ContentValues();
+					vals.put("IP", peer.getIpAddress());
+					vals.put("IndexHash", peer.getIndexHash());
+					vals.put("LastSeen", peer.getTimestamp());
 
-							// Update the peer entry in the database
-							database.insertWithOnConflict(Client.PEER_TABLE, null, vals, SQLiteDatabase.CONFLICT_REPLACE);
-							
-							// Don't download anything
-							continue;
-						}
-						
-						// Check if the old index hash is valid
-						oldHash = getOldHashOfPeerIndex(peer);
-						if (oldHash == peer.getIndexHash())
-						{
-							// Peer is up to date
-							peer.setState(Peer.STATE_UP_TO_DATE);
-							
-							System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
-							
-							// Don't download anything
-							continue;
-						}
-						
-						// No updater running and index is not up to date
-						peer.setState(Peer.STATE_UPDATING);
-						Thread t = new IndexDownloadThread(this, getPeerDatabase(peer), peer, listener, killDownload);
-						indexDownloadThreads.put(peer, t);
-						t.start();
-						threads++;
-					}
+					// Update the peer entry in the database
+					database.insertWithOnConflict(Client.PEER_TABLE, null, vals, SQLiteDatabase.CONFLICT_REPLACE);
+					
+					// Don't download anything
+					continue;
 				}
+				
+				// Check if the old index hash is valid
+				oldHash = getOldHashOfPeerIndex(peer);
+				if (oldHash == peer.getIndexHash())
+				{
+					// Peer is up to date
+					peer.setState(Peer.STATE_UP_TO_DATE);
+					
+					System.out.println(peer.getIpAddress()+" index is up to date (hash: "+peer.getIndexHash()+")");
+					
+					// Don't download anything
+					continue;
+				}
+				
+				// No updater running and index is not up to date
+				peer.setState(Peer.STATE_UPDATING);
+				
+				Runnable task = new IndexDownloadTask(this, getPeerDatabase(peer), peer, listener, killDownload);
+				downloadTasks.put(peer, task);
+				downloadPool.execute(task);
+				downloads++;
 			}
 		}
 		
 		// Update the list view
 		PeerList.updateListView();
 		
-		return threads;
+		return downloads;
 	}
 	
 	public void waitForSearch()
 	{
-		synchronized (searchThreads) {
-			// Interrupt existing search threads
-			for (Thread t : searchThreads) {
-				try {
-					t.join();
-				} catch (InterruptedException e) {}
-			}
-			
-			// Everyone's dead
-			searchThreads.clear();
-		}
+		try {
+			searchPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+		} catch (InterruptedException e) { }
 	}
 	
 	public void endSearch()
-	{
-		// Start the killing
+	{		
+		for (Map.Entry<PeerSet.Peer, Runnable> entries : searchTasks.entrySet())
+		{
+			// Remove all entries we can
+			if (searchPool.remove(entries.getValue())) {
+				// Task didn't run, so we need to remove it from our search tasks map
+				searchTasks.remove(entries.getKey());
+			}
+		}
+		
+		// Kill tasks in progress
 		killSearch.set(true);
+		
+		// Purge the pool
+		searchPool.purge();
 	}
 	
 	public int getPeerCount()
@@ -710,26 +706,21 @@ public class Client {
 		// Stop killing searches
 		killSearch.set(false);
 		
-		// Make sure the peer list isn't modified by the search threads while we're iterating
-		synchronized (peers) {
-			// Start search threads for each peer
-			Iterator<PeerSet.Peer> peerIterator = peers.getPeerListIterator();
-			while (peerIterator.hasNext())
+		// Start search threads for each peer
+		Iterator<PeerSet.Peer> peerIterator = peers.getPeerListIterator();
+		while (peerIterator.hasNext())
+		{
+			PeerSet.Peer peer = peerIterator.next();
+			
+			// Check if this is the peer we want
+			if (peerIp.equals(peer.getIpAddress()))
 			{
-				PeerSet.Peer peer = peerIterator.next();
-				
-				// Check if this is the peer we want
-				if (peerIp.equals(peer.getIpAddress()))
-				{
-					// Start the search thread
-					System.out.println("Spawning thread to search "+peer.getIpAddress());
-					Thread t = new SearchThread(this, getPeerDatabase(peer), peer, listener, null, killSearch);
-					synchronized (searchThreads) {
-						searchThreads.add(t);
-					}
-					t.start();
-					return true;
-				}
+				// Start the search thread
+				System.out.println("Queueing search task to search "+peer.getIpAddress());
+				Runnable task = new SearchTask(this, getPeerDatabase(peer), peer, listener, null, killSearch);
+				searchTasks.put(peer, task);
+				searchPool.execute(task);
+				return true;
 			}
 		}
 		
@@ -738,7 +729,7 @@ public class Client {
 	
 	public int beginSearch(String query, ResultListener listener) throws IOException
 	{
-		int threads = 0;
+		int searches = 0;
 		
 		if (peers == null)
 		{
@@ -748,26 +739,21 @@ public class Client {
 		// Stop killing searches
 		killSearch.set(false);
 		
-		// Make sure the peer list isn't modified by the search threads while we're iterating
-		synchronized (peers) {
-			// Start search threads for each peer
-			Iterator<PeerSet.Peer> peerIterator = peers.getPeerListIterator();
-			while (peerIterator.hasNext())
-			{
-				PeerSet.Peer peer = peerIterator.next();
+		// Start search threads for each peer
+		Iterator<PeerSet.Peer> peerIterator = peers.getPeerListIterator();
+		while (peerIterator.hasNext())
+		{
+			PeerSet.Peer peer = peerIterator.next();
 
-				// Start the search thread
-				System.out.println("Spawning thread to search "+peer.getIpAddress());
-				Thread t = new SearchThread(this, getPeerDatabase(peer), peer, listener, query, killSearch);
-				synchronized (searchThreads) {
-					searchThreads.add(t);
-				}
-				t.start();
-				threads++;
-			}
+			// Start the search thread
+			System.out.println("Queueing search task to search "+peer.getIpAddress());
+			Runnable task = new SearchTask(this, getPeerDatabase(peer), peer, listener, null, killSearch);
+			searchTasks.put(peer, task);
+			searchPool.execute(task);
+			searches++;
 		}
 		
-		return threads;
+		return searches;
 	}
 
 	@TargetApi(11)
@@ -863,14 +849,14 @@ public class Client {
 	}
 }
 
-class IndexDownloadThread extends Thread {
-	SQLiteDatabase peerindex;
-	PeerSet.Peer peer;
-	Client client;
-	IndexDownloadListener listener;
-	AtomicBoolean interrupt;
+class IndexDownloadTask implements Runnable {
+	private SQLiteDatabase peerindex;
+	private PeerSet.Peer peer;
+	private Client client;
+	private IndexDownloadListener listener;
+	private AtomicBoolean interrupt;
 	
-	public IndexDownloadThread(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, IndexDownloadListener listener, AtomicBoolean interrupt)
+	public IndexDownloadTask(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, IndexDownloadListener listener, AtomicBoolean interrupt)
 	{
 		this.client = client;
 		this.peerindex = peerindex;
@@ -1050,21 +1036,24 @@ class IndexDownloadThread extends Thread {
 				// Notify the listener
 				listener.indexDownloadComplete(peer.getIpAddress());
 			}
+			
+			// Remove us from the download list
+			client.downloadTasks.remove(peer);
 		}
 	}
 }
 
-class SearchThread extends Thread {
-	PeerSet.Peer peer;
-	SQLiteDatabase peerindex;
-	String query;
-	ResultListener listener;
-	Client client;
-	AtomicBoolean interrupt;
+class SearchTask implements Runnable {
+	private PeerSet.Peer peer;
+	private SQLiteDatabase peerindex;
+	private String query;
+	private ResultListener listener;
+	private Client client;
+	private AtomicBoolean interrupt;
 	
 	private static final int LIMIT_PER_QUERY = 10000;
 	
-	public SearchThread(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, ResultListener listener, String query, AtomicBoolean interrupt)
+	public SearchTask(Client client, SQLiteDatabase peerindex, PeerSet.Peer peer, ResultListener listener, String query, AtomicBoolean interrupt)
 	{
 		this.client = client;
 		this.peerindex = peerindex;
@@ -1132,5 +1121,8 @@ class SearchThread extends Thread {
 		
 		// Search finished
 		listener.searchComplete(query, peer);
+		
+		// Remove us from the hash map
+		client.searchTasks.remove(peer);
 	}
 }

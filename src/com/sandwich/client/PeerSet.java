@@ -1,14 +1,14 @@
 package com.sandwich.client;
 
-import java.util.HashMap;
 import java.util.Iterator;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class PeerSet {
-	private HashMap<Peer, Peer> peerSet;
+	private ConcurrentHashMap<Peer, Peer> peerSet;
 	
 	public PeerSet()
 	{
-		peerSet = new HashMap<Peer, Peer>();
+		peerSet = new ConcurrentHashMap<Peer, Peer>();
 	}
 	
 	public synchronized void updatePeerSet(PeerSet peers)
@@ -23,15 +23,22 @@ public class PeerSet {
 		}
 	}
 	
-	public synchronized void updatePeer(Peer p)
+	public void updatePeer(Peer p)
 	{
 		Peer oldPeer = peerSet.get(p);
+		
+		// If they're the same, we're done
+		if (oldPeer == p)
+			return;
+		
 		if (oldPeer != null)
 		{
 			// Update an existing peer
-			oldPeer.indexHash = p.indexHash;
-			oldPeer.timestamp = p.timestamp;
-			oldPeer.state = p.state;
+			synchronized (oldPeer) {
+				oldPeer.indexHash = p.indexHash;
+				oldPeer.timestamp = p.timestamp;
+				oldPeer.state = p.state;
+			}
 		}
 		else
 		{
@@ -41,23 +48,20 @@ public class PeerSet {
 		}
 	}
 	
-	public synchronized void updatePeer(String ip, String timestamp, long indexHash, int state)
+	public void updatePeer(String ip, String timestamp, long indexHash, int state)
 	{
 		updatePeer(new Peer(ip, timestamp, indexHash, state));
 	}
 	
-	public synchronized boolean removePeer(String ip)
+	public boolean removePeer(String ip)
 	{
-		for (Peer p : peerSet.values())
-			if (p.getIpAddress().equals(ip))
-				return removePeer(p);
-		
-		return false;
+		Peer p = new Peer(ip, null, 0, 0);
+		return removePeer(p);
 	}
 	
-	public synchronized boolean removePeer(Peer p)
+	public boolean removePeer(Peer p)
 	{
-		if (peerSet.remove(p) != null)
+		if ((p = peerSet.remove(p)) != null)
 		{
 			p.setPeerSet(null);
 			return true;

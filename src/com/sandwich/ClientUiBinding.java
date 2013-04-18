@@ -7,6 +7,10 @@ import java.net.UnknownHostException;
 import java.security.NoSuchAlgorithmException;
 import java.util.Iterator;
 import java.util.Set;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import android.app.Activity;
 import android.content.Context;
@@ -19,29 +23,49 @@ import com.sandwich.client.ResultListener;
 import com.sandwich.player.MediaMimeInfo;
 
 @SuppressWarnings("deprecation") // Needed to avoid stupid warnings for older ClipboardManager class
-public class ClientUiBinding implements Runnable {
+public class ClientUiBinding {
 	private Context appContext;
 	private Search searchActivity;
 	private Client client;
 	private boolean loadedCache;
-	private Thread thread;
+	private ThreadPoolExecutor bootstrapThreadPool;
 	public Blacklist blacklist;
 	
 	public ClientUiBinding(Context appContext)
 	{
 		this.appContext = appContext;
 		this.blacklist = new Blacklist(appContext);
+		
+		// This is a bounded queue of 1 entry, plus a single worker thread to process bootstrap requests
+		this.bootstrapThreadPool = new ThreadPoolExecutor(1, 1, Long.MAX_VALUE, TimeUnit.NANOSECONDS, new ArrayBlockingQueue<Runnable>(1));
 	}
 	
 	public void bootstrap()
 	{
-        // Start the bootstrapping process if it's not already running
-    	if (thread == null || thread.getState() == Thread.State.TERMINATED)
-    	{
-    		System.out.println("Starting new bootstrap thread");
-    		thread = new Thread(this);
-    		thread.start();
-    	}
+		try {
+			bootstrapThreadPool.execute(new Runnable() {
+				@Override
+				public void run() {
+					if (client == null)
+						throw new IllegalStateException("Bootstrap thread was not initialized");
+
+			        if (!loadedCache) {
+			        	// Bootstrap from the cache initially
+			        	client.bootstrapFromCache();
+			        	loadedCache = true;
+			        }
+					
+					try {
+						client.bootstrapFromNetwork(Settings.getBootstrapNode(appContext),
+								null, blacklist.getBlacklistSet());
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+				}
+			});
+		} catch (RejectedExecutionException e) {
+			// The queue already has a bootstrap waiting
+		}
 	}
 	
 	public void registerSearchActivity(Search searchActivity)
@@ -208,25 +232,6 @@ public class ClientUiBinding implements Runnable {
 		if (client != null)
 		{
 			client.release();
-		}
-	}
-	
-	@Override
-	public void run() {
-		if (client == null)
-			throw new IllegalStateException("Bootstrap thread was not initialized");
-
-        if (!loadedCache) {
-        	// Bootstrap from the cache initially
-        	client.bootstrapFromCache();
-        	loadedCache = true;
-        }
-		
-		try {
-			client.bootstrapFromNetwork(Settings.getBootstrapNode(appContext),
-					null, blacklist.getBlacklistSet());
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
 	}
 }
