@@ -25,13 +25,13 @@ import android.app.Activity;
 import android.content.Intent;
 
 public class PeerList extends Activity implements OnItemClickListener {
-	private static ClientThread client;
+	private static ClientUiBinding client;
 	private ListView peerList;
 	private static ArrayAdapter<Peer> adapter;
 	private static Activity thisActivity;
 	private static boolean suspendUpdates, queuedUpdate;
 	
-	public static void addClient(ClientThread t) {
+	public static void addClient(ClientUiBinding t) {
 		client = t;
 	}
 	

@@ -19,7 +19,7 @@ import com.sandwich.client.ResultListener;
 import com.sandwich.player.MediaMimeInfo;
 
 @SuppressWarnings("deprecation") // Needed to avoid stupid warnings for older ClipboardManager class
-public class ClientThread implements Runnable {
+public class ClientUiBinding implements Runnable {
 	private Context appContext;
 	private Search searchActivity;
 	private Client client;
@@ -27,7 +27,7 @@ public class ClientThread implements Runnable {
 	private Thread thread;
 	public Blacklist blacklist;
 	
-	public ClientThread(Context appContext)
+	public ClientUiBinding(Context appContext)
 	{
 		this.appContext = appContext;
 		this.blacklist = new Blacklist(appContext);

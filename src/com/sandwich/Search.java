@@ -23,12 +23,12 @@ import android.app.Activity;
 import android.content.Context;
 
 public class Search extends Activity implements TextView.OnEditorActionListener {
-	private static ClientThread client;
+	private static ClientUiBinding client;
 	private ListView list;
 	private EditText searchBox;
 	SearchListener listener;
 
-	public static void addClient(ClientThread t) {
+	public static void addClient(ClientUiBinding t) {
 		client = t;
 	}
 	

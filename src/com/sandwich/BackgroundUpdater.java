@@ -4,11 +4,11 @@ import java.util.Timer;
 import java.util.TimerTask;
 
 public class BackgroundUpdater {
-	private ClientThread client;
+	private ClientUiBinding client;
 	private int interval;
 	private Timer timer;
 	
-	public BackgroundUpdater(ClientThread client, int interval) {
+	public BackgroundUpdater(ClientUiBinding client, int interval) {
 		this.client = client;
 		this.interval = interval;
 	}

@@ -22,7 +22,7 @@ import android.widget.ListView;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 
 public class PeerFiles extends Activity implements ResultListener, Runnable, OnItemClickListener {
-	private static ClientThread client;
+	private static ClientUiBinding client;
 	private String peer;
 	private ListView filesView;
 	private ArrayAdapter<ResultListener.Result> adapter;
@@ -30,7 +30,7 @@ public class PeerFiles extends Activity implements ResultListener, Runnable, OnI
 
 	public static final String PEER = "Peer";	
 	
-	public static void addClient(ClientThread t) {
+	public static void addClient(ClientUiBinding t) {
 		client = t;
 	}
 	
