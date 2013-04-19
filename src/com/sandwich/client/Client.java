@@ -747,7 +747,7 @@ public class Client {
 
 			// Start the search thread
 			System.out.println("Queueing search task to search "+peer.getIpAddress());
-			Runnable task = new SearchTask(this, getPeerDatabase(peer), peer, listener, null, killSearch);
+			Runnable task = new SearchTask(this, getPeerDatabase(peer), peer, listener, query, killSearch);
 			searchTasks.put(peer, task);
 			searchPool.execute(task);
 			searches++;
