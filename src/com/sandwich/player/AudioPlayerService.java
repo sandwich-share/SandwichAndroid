@@ -66,6 +66,8 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 	private String metastring = "";
 	private byte[] albumart = null;
 	
+	private boolean hasResources;
+	
 	private Handler handler;
 	private IntentFilter noisyIntents = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
 	
@@ -86,6 +88,7 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			this.service = service;
 		}
 		
+		@TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
 		public void initialize(Activity activity, Uri filePath) throws IllegalArgumentException, SecurityException, IllegalStateException, IOException
 		{
 			service.activity = activity;
@@ -150,6 +153,17 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 
 			// We want this activity's audio controls to change the music volume
 			activity.setVolumeControlStream(AudioManager.STREAM_MUSIC);
+			
+			WifiManager wm = (WifiManager) activity.getSystemService(Context.WIFI_SERVICE);
+			
+			// Create a WLAN lock to maintain wireless capability during playback (not acquired yet)
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1)
+				wlanLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Sandwich Audio Player");
+			else
+				wlanLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL, "Sandwich Audio Player");
+			
+			// Register for media button events
+			am.registerMediaButtonEventReceiver(new ComponentName(activity, AudioEventReceiver.class));
 		}
 		
 		public void fastForward()
@@ -196,15 +210,20 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		}
 		
 		public void stop()
-		{
-			// Unregister our media button receiver
-			am.unregisterMediaButtonEventReceiver(new ComponentName(activity, AudioEventReceiver.class));
-			
+		{	
 			// Dismiss the wait dialog
 			if (waitDialog != null)
 			{
 				waitDialog.dismiss();
 				waitDialog = null;
+			}
+			
+			// If we were supposed to be playing, release resources
+			if (hasResources)
+			{
+				activity.unregisterReceiver(audioEventReceiver);
+				releaseNetworkUseLock();
+				hasResources = false;
 			}
 			
 			// Drop audio focus and WLAN lock then stop
@@ -229,6 +248,9 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		{
 			// Stop the player first
 			stop();
+			
+			// Unregister our media button receiver
+			am.unregisterMediaButtonEventReceiver(new ComponentName(activity, AudioEventReceiver.class));
 			
 			// Delete the notification
 			service.stopForeground(true);
@@ -318,7 +340,6 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		metastring = artist + " - " + title;
 	}
 
-	@TargetApi(Build.VERSION_CODES.HONEYCOMB_MR1)
 	@Override
 	@SuppressWarnings("deprecation")
 	public void onPrepared(MediaPlayer mp)
@@ -330,14 +351,6 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			waitDialog = null;
 		}
 		
-		WifiManager wm = (WifiManager) activity.getSystemService(Context.WIFI_SERVICE);
-		
-		// Create a WLAN lock to maintain wireless capability during playback (not acquired yet)
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB_MR1)
-			wlanLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Sandwich Audio Player");
-		else
-			wlanLock = wm.createWifiLock(WifiManager.WIFI_MODE_FULL, "Sandwich Audio Player");
-		
 		pi = PendingIntent.getActivity(activity.getApplicationContext(), 0,
                 new Intent(activity.getApplicationContext(), com.sandwich.AudioPlayer.class),
                 PendingIntent.FLAG_UPDATE_CURRENT);
@@ -348,19 +361,11 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		notification.setLatestEventInfo(activity.getApplicationContext(), "Sandwich Audio Player",
                 "", pi);
 		startForeground(NOTIFICATION_ID, notification);
-
-		// Register for media button events
-		am.registerMediaButtonEventReceiver(new ComponentName(activity, AudioEventReceiver.class));
 		
 		// Setup the progress bar with the duration of the media
 		seeker.setMax(player.getDuration());
 		seeker.setProgress(0);
 		player.seekTo(0);
-		
-		// Request audio focus
-		int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
-		if (res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
-			onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN);
 		
 		// If we're API level 10+, we have a metadata retreiver that we'll spin off to pull down
 		// album art, artist, and song title. It will also update our notification using the pending
@@ -370,6 +375,11 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			metadataThread = new Thread(this);
 			metadataThread.start();
 		}
+		
+		// Request audio focus
+		int res = am.requestAudioFocus(this, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+		if (res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED)
+			onAudioFocusChange(AudioManager.AUDIOFOCUS_GAIN);
 	}
 
 	@Override
@@ -461,11 +471,13 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 		handler.removeMessages(SHOW_PROGRESS);
 		playpause.setText("Play");
 		
-		// Unregister audio events
-		activity.unregisterReceiver(audioEventReceiver);
-		
-		// Release the network lock
-		releaseNetworkUseLock();
+		// If we were supposed to be playing, release resources
+		if (hasResources)
+		{
+			activity.unregisterReceiver(audioEventReceiver);
+			releaseNetworkUseLock();
+			hasResources = false;
+		}
 		
 		// Set seeker to start
 		seeker.setProgress(0);
@@ -510,23 +522,35 @@ public class AudioPlayerService extends Service implements MediaPlayer.OnErrorLi
 			// Stop playing
 			if (player.isPlaying())
 			{
-				activity.unregisterReceiver(audioEventReceiver);
 				player.pause();
-				releaseNetworkUseLock();
 				handler.removeMessages(SHOW_PROGRESS);
 				playpause.setText("Play");
+			}
+			
+			// If we were supposed to be playing, release resources
+			if (hasResources)
+			{
+				activity.unregisterReceiver(audioEventReceiver);
+				releaseNetworkUseLock();
+				hasResources = false;
 			}
 			break;
 			
 		case AudioManager.AUDIOFOCUS_GAIN:
+			// If we weren't playing, get resources
+			if (!hasResources)
+			{
+				activity.registerReceiver(audioEventReceiver, noisyIntents);
+				acquireNetworkUseLock();
+				hasResources = true;
+			}
+			
 			if (!player.isPlaying())
 			{
 				// Start playing
-				acquireNetworkUseLock();
 				player.start();
 				handler.sendEmptyMessage(SHOW_PROGRESS);
 				playpause.setText("Pause");
-				activity.registerReceiver(audioEventReceiver, noisyIntents);
 			}
 			break;
 		}
