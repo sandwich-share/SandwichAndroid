@@ -13,8 +13,12 @@ public class PeerSet {
 	
 	public synchronized void updatePeerSet(PeerSet peers)
 	{
-		// Clear peer set first
-		peerSet.clear();
+		// Prune peers that are in the current set, but not the new one
+		for (Peer p : peerSet.values())
+		{
+			if (!peers.peerSet.contains(p))
+				peerSet.remove(p);
+		}
 		
 		// Add a copy of each peer into our peer set
 		for (Peer p : peers.peerSet.values())
@@ -37,7 +41,10 @@ public class PeerSet {
 			synchronized (oldPeer) {
 				oldPeer.indexHash = p.indexHash;
 				oldPeer.timestamp = p.timestamp;
-				oldPeer.state = p.state;
+				
+				// Only update the state if it's not unknown
+				if (p.state != Peer.STATE_UNKNOWN)
+					oldPeer.state = p.state;
 			}
 		}
 		else

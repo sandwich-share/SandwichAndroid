@@ -112,9 +112,14 @@ public class PeerList extends Activity implements OnItemClickListener {
         case R.id.blacklist:
         	if (client.blacklist.isBlacklisted(peer.getIpAddress())) {
         		client.blacklist.removeFromBlacklist(peer.getIpAddress());
+        		peer.setState(Peer.STATE_UNKNOWN);
         	} else {
         		client.blacklist.addToBlacklist(peer.getIpAddress());
+        		peer.setState(Peer.STATE_BLACKLISTED);
         	}
+        	
+        	// Update the list view
+        	updateListView();
         	
         	// Bootstrap so the changes take effect
         	client.bootstrap();
