@@ -78,14 +78,17 @@
         </activity>
         <activity
             android:name="com.sandwich.PeerList"
+            android:configChanges="orientation|screenSize"
             android:label="@string/title_activity_peer_list" >
         </activity>
         <activity
             android:name="com.sandwich.PeerFiles"
+            android:configChanges="orientation|screenSize"
             android:label="@string/title_activity_peer_files" >
         </activity>
         <activity
             android:name="com.sandwich.Settings"
+            android:configChanges="orientation|screenSize"
             android:label="@string/title_activity_settings" >
         </activity>
     </application>
