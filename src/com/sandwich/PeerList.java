@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import com.sandwich.client.ClientManager;
 import com.sandwich.client.PeerSet;
 import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.ui.DetailsDialog;
@@ -25,20 +26,18 @@ import android.app.Activity;
 import android.content.Intent;
 
 public class PeerList extends Activity implements OnItemClickListener {
-	private static ClientUiBinding client;
+	private ClientUiBinding client;
 	private ListView peerList;
 	private static ArrayAdapter<Peer> adapter;
-	private static Activity thisActivity;
+	private static PeerList thisActivity;
 	private static boolean suspendUpdates, queuedUpdate;
-	
-	public static void addClient(ClientUiBinding t) {
-		client = t;
-	}
-	
+
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_peer_list);
+		
+		client = ClientManager.getClientBinding(getApplicationContext());
 		
 		// This is the current peer list activity
 		thisActivity = this;
@@ -61,6 +60,8 @@ public class PeerList extends Activity implements OnItemClickListener {
 	
 	@Override
 	protected void onDestroy() {
+		ClientManager.freeClientBinding();
+		
 		// Deregister our activity
 		thisActivity = null;
 		super.onDestroy();
@@ -156,7 +157,7 @@ public class PeerList extends Activity implements OnItemClickListener {
 			thisActivity.runOnUiThread(new Runnable() {
 				@Override
 				public void run() {
-					List<Peer> peerList = new ArrayList<Peer>(client.getPeerSet());
+					List<Peer> peerList = new ArrayList<Peer>(thisActivity.client.getPeerSet());
 					System.out.println("Refreshing peer list");
 					
 					// Sort the list alphabetically

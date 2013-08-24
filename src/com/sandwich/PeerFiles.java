@@ -2,6 +2,7 @@ package com.sandwich;
 
 import java.util.concurrent.ConcurrentLinkedQueue;
 
+import com.sandwich.client.ClientManager;
 import com.sandwich.client.PeerSet.Peer;
 import com.sandwich.client.Client;
 import com.sandwich.client.ResultListener;
@@ -22,22 +23,20 @@ import android.widget.ListView;
 import android.widget.AdapterView.AdapterContextMenuInfo;
 
 public class PeerFiles extends Activity implements ResultListener, Runnable, OnItemClickListener {
-	private static ClientUiBinding client;
+	private ClientUiBinding client;
 	private String peer;
 	private ListView filesView;
 	private ArrayAdapter<ResultListener.Result> adapter;
 	private ConcurrentLinkedQueue<ResultListener.Result> results;
 
-	public static final String PEER = "Peer";	
-	
-	public static void addClient(ClientUiBinding t) {
-		client = t;
-	}
+	public static final String PEER = "Peer";
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_peer_files);
+		
+		client = ClientManager.getClientBinding(getApplicationContext());
 		
 		peer = getIntent().getExtras().getString(PEER);
 		setTitle("File List for "+peer);
@@ -56,6 +55,7 @@ public class PeerFiles extends Activity implements ResultListener, Runnable, OnI
 	@Override
 	protected void onDestroy() {
 		client.endSearch();
+		ClientManager.freeClientBinding();
 		super.onDestroy();
 	}
 
@@ -68,6 +68,7 @@ public class PeerFiles extends Activity implements ResultListener, Runnable, OnI
 	@Override
 	public void searchComplete(String query, Peer peer) {
 		// Done getting index
+		System.out.println("Query on peer "+peer+" has completed");
 	}
 	
 	@Override

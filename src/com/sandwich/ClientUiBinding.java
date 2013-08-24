@@ -43,18 +43,18 @@ public class ClientUiBinding {
 	public void bootstrap()
 	{
 		try {
+			if (client == null)
+				throw new IllegalStateException("Bootstrap thread was not initialized");
+
+	        if (!loadedCache) {
+	        	// Bootstrap from the cache initially
+	        	client.bootstrapFromCache();
+	        	loadedCache = true;
+	        }
+			
 			bootstrapThreadPool.execute(new Runnable() {
 				@Override
 				public void run() {
-					if (client == null)
-						throw new IllegalStateException("Bootstrap thread was not initialized");
-
-			        if (!loadedCache) {
-			        	// Bootstrap from the cache initially
-			        	client.bootstrapFromCache();
-			        	loadedCache = true;
-			        }
-					
 					try {
 						client.bootstrapFromNetwork(Settings.getBootstrapNode(appContext),
 								null, blacklist.getBlacklistSet());
@@ -69,7 +69,7 @@ public class ClientUiBinding {
 	}
 	
 	public void registerSearchActivity(Search searchActivity)
-	{        
+	{
 		this.searchActivity = searchActivity;
 	}
 	
@@ -225,6 +225,9 @@ public class ClientUiBinding {
     	
     	// Register our package manager with the MIME class
     	MediaMimeInfo.registerPackageManager(appContext.getPackageManager());
+    	
+    	// Bootstrap
+    	bootstrap();
 	}
 	
 	public void release()

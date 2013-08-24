@@ -3,6 +3,7 @@ package com.sandwich.client;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.Inet6Address;
@@ -33,9 +34,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import com.fasterxml.jackson.core.JsonFactory;
-import com.fasterxml.jackson.core.JsonParser;
-import com.fasterxml.jackson.core.JsonToken;
 import com.sandwich.PeerList;
 import com.sandwich.Settings;
 import com.sandwich.client.PeerSet.Peer;
@@ -56,6 +54,7 @@ import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
+import android.util.JsonReader;
 
 public class Client {
 	private Context context;
@@ -87,10 +86,10 @@ public class Client {
 		this.killDownload = new AtomicBoolean();
 		this.searchPool = new ThreadPoolExecutor(1, Integer.MAX_VALUE, Long.MAX_VALUE, TimeUnit.NANOSECONDS, new LinkedBlockingQueue<Runnable>());
 		this.downloadPool = new ThreadPoolExecutor(1, Integer.MAX_VALUE, Long.MAX_VALUE, TimeUnit.NANOSECONDS, new LinkedBlockingQueue<Runnable>());
-		this.downloadTasks = new ConcurrentHashMap<PeerSet.Peer, Runnable>();
-		this.searchTasks = new ConcurrentHashMap<PeerSet.Peer, Runnable>();
+		this.downloadTasks = new ConcurrentHashMap<PeerSet.Peer, Runnable>(4, 0.9f, 1);
+		this.searchTasks = new ConcurrentHashMap<PeerSet.Peer, Runnable>(4, 0.9f, 1);
 	}
-	
+
 	// Holy fucking shit
 	private static int unsign(byte signed)
 	{
@@ -396,6 +395,8 @@ public class Client {
 	
 	public void release()
 	{
+		System.out.println("Tearing down Client object");
+		
 		// Kill search threads
 		endSearch();
 		
@@ -417,6 +418,8 @@ public class Client {
 		// Close the peer list db
 		if (database != null)
 			database.close();
+		
+		System.out.println("Client torn down");
 	}
 	
 	private boolean readCachedBootstrapData()
@@ -531,9 +534,11 @@ public class Client {
 		throw new IllegalStateException("No peers online");
 	}
 	
-	public void waitForBootstrap()
+	private void waitForBootstrap()
 	{
 		try {
+			downloadPool.shutdownNow();
+			downloadTasks.clear();
 			downloadPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
 		} catch (InterruptedException e) { }
 	}
@@ -666,15 +671,17 @@ public class Client {
 		return downloads;
 	}
 	
-	public void waitForSearch()
+	private void waitForSearch()
 	{
 		try {
+			searchPool.shutdownNow();
+			searchTasks.clear();
 			searchPool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
 		} catch (InterruptedException e) { }
 	}
 	
 	public void endSearch()
-	{		
+	{
 		for (Map.Entry<PeerSet.Peer, Runnable> entries : searchTasks.entrySet())
 		{
 			// Remove all entries we can
@@ -899,58 +906,55 @@ class IndexDownloadTask implements Runnable {
 			SQLiteStatement insertStmt = peerindex.compileStatement("INSERT OR REPLACE INTO "+Client.getTableNameForPeer(peer)+" VALUES (?1, ?2, ?3);");
 
 			// Read from the GET response
-			JsonFactory jfactory = new JsonFactory();
-			JsonParser parser = jfactory.createJsonParser(new BufferedInputStream(in));
+			JsonReader reader = new JsonReader(new InputStreamReader(new BufferedInputStream(in)));
+			reader.setLenient(true);
 			
 			// Begin transaction
 			peerindex.execSQL("BEGIN TRANSACTION");
 			try {
 				// Parse the index object
-				parser.nextToken();
-				while (parser.nextToken() != JsonToken.END_OBJECT)
+				reader.beginObject();
+				while (reader.hasNext())
 				{
-					String ioname = parser.getCurrentName();
+					String ioname = reader.nextName();
 					
 					if (ioname.equals("IndexHash"))
 					{
-						parser.nextToken();
-						indexHash = parser.getLongValue();
+						indexHash = reader.nextLong();
 						gotIndexHash = true;
 					}
 					else if (ioname.equals("TimeStamp"))
 					{
-						parser.nextToken();
-						timeStamp = parser.getText();
+						timeStamp = reader.nextString();
 					}
 					else if (ioname.equals("List"))
 					{
-						parser.nextToken();
-						while (parser.nextToken() != JsonToken.END_ARRAY)
-						{							
-							while (parser.nextToken() != JsonToken.END_OBJECT)
+						reader.beginArray();
+						while (reader.hasNext())
+						{
+							reader.beginObject();
+							while (reader.hasNext())
 							{
-								String foname = parser.getCurrentName();
+								String foname = reader.nextName();
 								
 								if (foname.equals("FileName"))
 								{
-									parser.nextToken();
-									insertStmt.bindString(1, parser.getText());
+									insertStmt.bindString(1, reader.nextString());
 								}
 								else if (foname.equals("CheckSum"))
 								{
-									parser.nextToken();
-									insertStmt.bindLong(3, parser.getLongValue());
+									insertStmt.bindLong(3, reader.nextLong());
 								}
 								else if (foname.equals("Size"))
 								{
-									parser.nextToken();
-									insertStmt.bindLong(2, parser.getLongValue());
+									insertStmt.bindLong(2, reader.nextLong());
 								}
 								else
 								{
-									parser.nextToken();
+									reader.skipValue();
 								}
 							}
+							reader.endObject();
 							
 							insertStmt.execute();
 							
@@ -958,12 +962,14 @@ class IndexDownloadTask implements Runnable {
 								throw new InterruptedException();
 							}
 						}
+						reader.endArray();
 					}
 					else
 					{
-						parser.nextToken();
+						reader.skipValue();
 					}
 				}
+				reader.endObject();
 			} finally {
 				// Commit transaction
 				peerindex.execSQL("END TRANSACTION");
@@ -975,7 +981,7 @@ class IndexDownloadTask implements Runnable {
 				insertStmt.close();
 				
 				// Close the JSON parser
-				parser.close();
+				reader.close();
 			}
 			
 			// Check if we got the header properly
@@ -1065,11 +1071,16 @@ class SearchTask implements Runnable {
 
 	@Override
 	public void run() {
+			
 		try {
 			int offset = 0, count;
 			do
 			{
 				Cursor c;
+				
+				if (interrupt.get())
+					throw new InterruptedException();
+				
 				try {
 					// Execute the query
 					c = peerindex.query(Client.getTableNameForPeer(peer),

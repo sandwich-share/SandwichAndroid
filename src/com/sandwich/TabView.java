@@ -1,5 +1,6 @@
 package com.sandwich;
 
+import com.sandwich.client.ClientManager;
 import com.sandwich.ui.DetailsDialog;
 import com.sandwich.ui.Dialog;
 import com.sandwich.ui.SpinnerDialog;
@@ -26,13 +27,9 @@ public class TabView extends TabActivity implements OnTabChangeListener {
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
-		// Setup the global client object and register it with each activity
-		client = new ClientUiBinding(getApplicationContext());
-        client.initialize();
-		Search.addClient(client);
-		PeerList.addClient(client);
-		PeerFiles.addClient(client);
 		super.onCreate(savedInstanceState);
+		
+		client = ClientManager.getClientBinding(getApplicationContext());
 		
 		// No title
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -96,14 +93,14 @@ public class TabView extends TabActivity implements OnTabChangeListener {
 	
 	@Override
 	public void onDestroy() {
-    	client.release();
+    	super.onDestroy();
+		
+    	ClientManager.freeClientBinding();
     	
     	Dialog.closeDialogs();
     	SpinnerDialog.closeDialogs();
     	DetailsDialog.dismissDialogs();
-    	
-    	super.onDestroy();
-	}
+   	}
 
 	@Override
 	public void onTabChanged(String tag) {

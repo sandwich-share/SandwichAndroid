@@ -1,6 +1,7 @@
 package com.sandwich;
 
 import com.sandwich.client.Client;
+import com.sandwich.client.ClientManager;
 import com.sandwich.client.ResultListener;
 import com.sandwich.client.ResultListener.Result;
 import com.sandwich.ui.DetailsDialog;
@@ -23,18 +24,17 @@ import android.app.Activity;
 import android.content.Context;
 
 public class Search extends Activity implements TextView.OnEditorActionListener {
-	private static ClientUiBinding client;
+	private ClientUiBinding client;
 	private ListView list;
 	private EditText searchBox;
 	SearchListener listener;
-
-	public static void addClient(ClientUiBinding t) {
-		client = t;
-	}
 	
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
+		
+		// Request the client
+		client = ClientManager.getClientBinding(getApplicationContext());
 		
 		// No title
 		requestWindowFeature(Window.FEATURE_NO_TITLE);
@@ -146,6 +146,7 @@ public class Search extends Activity implements TextView.OnEditorActionListener 
     	client.registerSearchActivity(null);
     	unregisterForContextMenu(list);
     	
+    	ClientManager.freeClientBinding();
     	super.onDestroy();
     }
 
