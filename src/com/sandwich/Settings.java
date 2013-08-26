@@ -22,7 +22,7 @@ public class Settings extends Activity implements OnCheckedChangeListener, OnFoc
 	
 	private static final String PREFS_FILE = "SandwichSettings";
 	
-	private static final String DEFAULT_INITIAL_NODE = "isys-ubuntu.case.edu";
+	private static final String DEFAULT_INITIAL_NODE = "sandstorm.case.edu";
 	private static int DEFAULT_REFRESH_INTERVAL = 15 * 1000; // 15 seconds
 
 	@Override
