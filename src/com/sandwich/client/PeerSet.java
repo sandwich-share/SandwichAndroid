@@ -12,14 +12,7 @@ public class PeerSet {
 	}
 	
 	public synchronized void updatePeerSet(PeerSet peers)
-	{
-		// Prune peers that are in the current set, but not the new one
-		for (Peer p : peerSet.values())
-		{
-			if (!peers.peerSet.contains(p))
-				peerSet.remove(p);
-		}
-		
+	{	
 		// Add a copy of each peer into our peer set
 		for (Peer p : peers.peerSet.values())
 		{
