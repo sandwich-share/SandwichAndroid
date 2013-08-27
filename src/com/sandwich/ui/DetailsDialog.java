@@ -1,5 +1,7 @@
 package com.sandwich.ui;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 
 import com.sandwich.client.Client;
@@ -130,7 +132,18 @@ public class DetailsDialog implements OnClickListener, Runnable {
 	    			break;
 	    		}
 	    		
-	    		builder.setMessage("State: "+state+"\nIndex Hash: "+peer.getIndexHash()+"\nLast Seen: "+peer.getTimestamp());
+	    		InetAddress ip;
+	    		try {
+	    			ip = InetAddress.getByName(peer.getIpAddress());
+	    		} catch (UnknownHostException e) {
+	    			ip = null;
+	    		}
+	    		
+	    		builder.setMessage("State: "+state+
+	    				           "\nIndex Hash: "+peer.getIndexHash()+
+	    				           "\nLast Seen: "+peer.getTimestamp()+
+	    				           "\nCurrent IP Address: "+peer.getIpAddress()+
+	    				           "\nPort: "+Client.getPortNumberFromIPAddress(ip));
 	    	}
 	    	
 	    	dialog = builder.create();

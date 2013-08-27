@@ -146,12 +146,19 @@ public class Client {
 		return (active != null && active.isConnected());
 	}
 	
-	public static int getPortNumberFromIPAddress(InetAddress address) throws NoSuchAlgorithmException
+	public static int getPortNumberFromIPAddress(InetAddress address)
 	{
-		MessageDigest md = MessageDigest.getInstance("MD5");
 		byte[] hash;
 		byte[] addr;
 		int port;
+		MessageDigest md;
+		
+		try {
+			md = MessageDigest.getInstance("MD5");
+		} catch (NoSuchAlgorithmException e) {
+			// MD5 should always be available on Android
+			return -1;
+		}
 		
 		// We need an IPv6 address in all cases
 		if (address instanceof Inet4Address)
