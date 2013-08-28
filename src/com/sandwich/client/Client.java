@@ -16,6 +16,7 @@ import java.net.URL;
 import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -309,13 +310,17 @@ public class Client {
 		{
 			JSONObject jsonPeer = jsonPeerList.getJSONObject(i);
 
-			peerSet.updatePeer(jsonPeer.getString("IP"), jsonPeer.getString("LastSeen"), jsonPeer.getLong("IndexHash"), Peer.STATE_UNKNOWN);
+			try {
+				peerSet.updatePeer(jsonPeer.getString("IP"), jsonPeer.getString("LastSeen"), jsonPeer.getLong("IndexHash"), Peer.STATE_UNKNOWN);
+			} catch (ParseException e) {
+				e.printStackTrace();
+			}
 		}
 		
 		return peerSet;
 	}
 	
-	private PeerSet getPeerSetFromDatabase(SQLiteDatabase database) throws SQLiteException
+	private PeerSet getPeerSetFromDatabase(SQLiteDatabase database) throws SQLiteException, ParseException
 	{
 		PeerSet peers = new PeerSet();
 		Cursor c = database.query(PEER_TABLE, new String[] {"IP", "IndexHash", "LastSeen"}, null, null, null, null, null, null);
@@ -439,7 +444,7 @@ public class Client {
 			// Try to read the peer set from the database
 			peers.updatePeerSet(getPeerSetFromDatabase(database));
 			success = peers.getPeerListLength() != 0;
-		} catch (SQLiteException e) {
+		} catch (Exception e) {
 			// An exception here means that the SQL database was probably corrupt
 			System.err.println("Rebuilding peer table");
 			database.execSQL("DROP TABLE IF EXISTS "+PEER_TABLE);
@@ -640,7 +645,7 @@ public class Client {
 					ContentValues vals = new ContentValues();
 					vals.put("IP", peer.getIpAddress());
 					vals.put("IndexHash", peer.getIndexHash());
-					vals.put("LastSeen", peer.getTimestamp());
+					vals.put("LastSeen", peer.getRawTimestamp());
 
 					// Update the peer entry in the database
 					database.insertWithOnConflict(Client.PEER_TABLE, null, vals, SQLiteDatabase.CONFLICT_REPLACE);

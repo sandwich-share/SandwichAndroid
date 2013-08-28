@@ -141,7 +141,7 @@ public class DetailsDialog implements OnClickListener, Runnable {
 	    		
 	    		builder.setMessage("State: "+state+
 	    				           "\nIndex Hash: "+peer.getIndexHash()+
-	    				           "\nLast Seen: "+peer.getTimestamp()+
+	    				           "\nLast Seen: "+peer.getRawTimestamp()+
 	    				           "\nCurrent IP Address: "+peer.getIpAddress()+
 	    				           "\nPort: "+Client.getPortNumberFromIPAddress(ip));
 	    	}

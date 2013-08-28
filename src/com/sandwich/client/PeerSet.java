@@ -1,5 +1,9 @@
 package com.sandwich.client;
 
+import android.annotation.SuppressLint;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.Iterator;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -32,12 +36,16 @@ public class PeerSet {
 		{
 			// Update an existing peer
 			synchronized (oldPeer) {
-				oldPeer.indexHash = p.indexHash;
-				oldPeer.timestamp = p.timestamp;
-				
-				// Only update the state if it's not unknown
-				if (p.state != Peer.STATE_UNKNOWN)
-					oldPeer.state = p.state;
+				if (oldPeer.timestamp.before(p.timestamp))
+				{
+					oldPeer.indexHash = p.indexHash;
+					oldPeer.timestamp = p.timestamp;
+					oldPeer.rawTimestamp = p.rawTimestamp;
+					
+					// Only update the state if it's not unknown
+					if (p.state != Peer.STATE_UNKNOWN)
+						oldPeer.state = p.state;
+				}
 			}
 		}
 		else
@@ -48,14 +56,16 @@ public class PeerSet {
 		}
 	}
 	
-	public void updatePeer(String ip, String timestamp, long indexHash, int state)
+	public void updatePeer(String ip, String timestamp, long indexHash, int state) throws ParseException
 	{
-		updatePeer(new Peer(ip, timestamp, indexHash, state));
+		Peer p = new Peer(ip, indexHash, state);
+		p.updateTimestamp(timestamp);
+		updatePeer(p);
 	}
 	
 	public boolean removePeer(String ip)
 	{
-		Peer p = new Peer(ip, null, 0, 0);
+		Peer p = new Peer(ip, 0, 0);
 		return removePeer(p);
 	}
 	
@@ -84,7 +94,8 @@ public class PeerSet {
 		private String ip;
 		private long indexHash;
 		private PeerSet peerSet;
-		private String timestamp;
+		private String rawTimestamp;
+		private Date timestamp;
 		private int state;
 		
 		public static final int STATE_UNKNOWN = 0;
@@ -94,12 +105,11 @@ public class PeerSet {
 		public static final int STATE_BLACKLISTED = 4;
 		public static final int STATE_UPDATE_FORBIDDEN = 5;
 		
-		public Peer(String ip, String timestamp, long indexHash, int state)
+		public Peer(String ip, long indexHash, int state)
 		{
 			this.ip = ip;
 			this.indexHash = indexHash;
 			this.peerSet = null;
-			this.timestamp = timestamp;
 			this.state = state;
 		}
 		
@@ -108,6 +118,7 @@ public class PeerSet {
 			this.ip = p.ip;
 			this.indexHash = p.indexHash;
 			this.peerSet = null;
+			this.rawTimestamp = p.rawTimestamp;
 			this.timestamp = p.timestamp;
 			this.state = p.state;
 		}
@@ -122,9 +133,13 @@ public class PeerSet {
 			return peerSet;
 		}
 		
-		public void updateTimestamp(String timestamp)
+		@SuppressLint("SimpleDateFormat")
+		public void updateTimestamp(String timestamp) throws ParseException
 		{
-			this.timestamp = timestamp;
+			SimpleDateFormat parser = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSSSSSZ");
+			
+			this.timestamp = parser.parse(timestamp);
+			this.rawTimestamp = timestamp;
 		}
 		
 		public boolean remove()
@@ -145,9 +160,14 @@ public class PeerSet {
 			return indexHash;
 		}
 		
-		public String getTimestamp()
+		public Date getTimestamp()
 		{
 			return timestamp;
+		}
+		
+		public String getRawTimestamp()
+		{
+			return rawTimestamp;
 		}
 		
 		public void updateIndexHash(long newHash)
