@@ -9,10 +9,12 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class PeerSet {
 	private ConcurrentHashMap<Peer, Peer> peerSet;
+	private AutoBlacklist autoBlacklist;
 	
-	public PeerSet()
+	public PeerSet(AutoBlacklist autoBlacklist)
 	{
-		peerSet = new ConcurrentHashMap<Peer, Peer>();
+		this.peerSet = new ConcurrentHashMap<Peer, Peer>();
+		this.autoBlacklist = autoBlacklist;
 	}
 	
 	public synchronized void updatePeerSet(PeerSet peers)
@@ -48,11 +50,15 @@ public class PeerSet {
 				}
 			}
 		}
-		else
+		else if (!autoBlacklist.isPeerBlacklisted(p))
 		{
 			// Otherwise add a new one
 			peerSet.put(p, p);
 			p.setPeerSet(this);
+		}
+		else
+		{
+			System.out.println("Skipping blacklisted peer: "+p);
 		}
 	}
 	

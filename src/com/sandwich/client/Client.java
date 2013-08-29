@@ -64,6 +64,7 @@ public class Client {
 	private AtomicBoolean killSearch, killDownload;
 	
 	private HashMap<PeerSet.Peer, SQLiteDatabase> peerDatabases;
+	AutoBlacklist autoBlacklist;
 	
 	// Accessed by child tasks
 	ConcurrentHashMap<PeerSet.Peer, Runnable> downloadTasks;
@@ -82,7 +83,8 @@ public class Client {
 	{
 		this.context = context;
 		this.peerDatabases = new HashMap<PeerSet.Peer, SQLiteDatabase>();
-		this.peers = new PeerSet();
+		this.autoBlacklist = new AutoBlacklist();
+		this.peers = new PeerSet(this.autoBlacklist);
 		this.killSearch = new AtomicBoolean();
 		this.killDownload = new AtomicBoolean();
 		this.searchPool = new ThreadPoolExecutor(1, Integer.MAX_VALUE, Long.MAX_VALUE, TimeUnit.NANOSECONDS, new LinkedBlockingQueue<Runnable>());
@@ -253,6 +255,9 @@ public class Client {
 		// Now append the query suffix
 		urlString += querySuffix;
 		
+		// We're client only
+		urlString += "?type=client";
+		
 		return new URL(urlString);
 	}
 	
@@ -305,7 +310,7 @@ public class Client {
 		conn.disconnect();
 		
 		jsonPeerList = new JSONArray(json);
-		peerSet = new PeerSet();
+		peerSet = new PeerSet(autoBlacklist);
 		for (int i = 0; i < jsonPeerList.length(); i++)
 		{
 			JSONObject jsonPeer = jsonPeerList.getJSONObject(i);
@@ -322,7 +327,7 @@ public class Client {
 	
 	private PeerSet getPeerSetFromDatabase(SQLiteDatabase database) throws SQLiteException, ParseException
 	{
-		PeerSet peers = new PeerSet();
+		PeerSet peers = new PeerSet(autoBlacklist);
 		Cursor c = database.query(PEER_TABLE, new String[] {"IP", "IndexHash", "LastSeen"}, null, null, null, null, null, null);
 		
 		c.moveToFirst();
@@ -515,6 +520,9 @@ public class Client {
 				peers.updatePeer(selectedPeer);
 				PeerList.updateListView();
 				
+				// Add them to the temporary blacklist
+				autoBlacklist.addBlacklistedPeer(selectedPeer);
+				
 				// Failed to connect to this one, so prune it
 				selectedPeer.remove();
 				
@@ -525,6 +533,9 @@ public class Client {
 			// Something failed if we got here, so remove them from our available peer list
 			availablePeers.remove(selectedPeer);
 		}
+		
+		// Clear the blacklist
+		autoBlacklist.clear();
 
 		// Try the initial peer if all else fails
 		try {
@@ -903,7 +914,7 @@ class IndexDownloadTask implements Runnable {
 		client.deletePeerFromDatabase(peer);
 		try {
 			// Build the query index URL
-			queryUrl = new URL(Client.createPeerUrlString(peer.getIpAddress(), "/fileindex", null));
+			queryUrl = new URL(Client.createPeerUrlString(peer.getIpAddress(), "/fileindex", "type=client"));
 			
 			// Connect a URL connection
 			conn = Client.createHttpConnection(queryUrl, false);
@@ -1022,6 +1033,10 @@ class IndexDownloadTask implements Runnable {
 			// Update was forbidden
 			peer.setState(Peer.STATE_UPDATE_FORBIDDEN);
 			client.peers.updatePeer(peer);
+			
+			// Add them to the temporary blacklist
+			client.autoBlacklist.addBlacklistedPeer(peer);
+			
 		} catch (Exception e) {
 			System.err.println("Failed to download index for peer: "+peer.getIpAddress());
 			
@@ -1034,6 +1049,9 @@ class IndexDownloadTask implements Runnable {
 			
 			// Remove this peer from the peer set
 			peer.remove();
+			
+			// Add them to the temporary blacklist
+			client.autoBlacklist.addBlacklistedPeer(peer);
 
 			// Remove them from the database
 			client.deletePeerFromDatabase(peer);
